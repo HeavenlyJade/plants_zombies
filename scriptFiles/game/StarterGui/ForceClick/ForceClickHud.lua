@@ -33,7 +33,7 @@ function ForceClickHud:FocusOnNode(node)
     self.down.Position = Vector2.New(pos.x - self.down.Size.x / 2, pos.y + size.y)
     self.left.Position = Vector2.New(pos.x - self.down.Size.x, pos.y)
     self.right.Position = Vector2.New(pos.x + size.x, pos.y)
-    self:Open()
+    -- self:Open()
 end
 
 return ForceClickHud.New(script.Parent, uiConfig)

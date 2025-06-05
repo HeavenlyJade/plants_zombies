@@ -106,10 +106,16 @@ function SkillTypeUtils.BuildSkillForest(skillCategory)
             end
         end
     end
-    -- 5. 检查孤立节点（未被遍历到的）
+    -- 5. 检查孤立节点（未被遍历到的），但只有入口技能才能作为根节点
     for name, node in pairs(nodeCache) do
         if not visited[node] then
-            forest[node.name] = node
+            -- 只有入口技能才能作为技能树根节点
+            if node.data.isEntrySkill then
+                forest[node.name] = node
+                gg.log("⚠️ 发现未连接的入口技能作为独立技能树:", node.name)
+            else
+                gg.log("⚠️ 发现循环依赖的非入口技能:", node.name, "父节点数:", #node.parents)
+            end
         end
     end
     return forest
@@ -221,5 +227,6 @@ function SkillTypeUtils.GetSkillTreeMaxDepth(node)
     return maxDepth + 1
 end
 
+-- 在模块返回前重新构建技能森林
 SkillTypeUtils.lastForest = SkillTypeUtils.BuildSkillForest(0)
 return SkillTypeUtils
