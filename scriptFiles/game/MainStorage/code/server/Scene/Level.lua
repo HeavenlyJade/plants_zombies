@@ -32,6 +32,7 @@ function Level:OnInit(levelType, sceneNode, index, scene)
     
     -- 运行时状态
     self.players = {} ---@type table<string, Player>
+    self.playerOriginalPositions = {} ---@type table<string, {position:Vector3, euler:Vector3}>
     self.isActive = false
     self.startTime = 0
     self.endTime = 0
@@ -98,6 +99,14 @@ function Level:Start()
     -- 将玩家传送到进入点
     local playerIndex = 1
     for _, player in pairs(self.players) do
+        -- 保存玩家原始位置
+        if player.actor then
+            self.playerOriginalPositions[player.uin] = {
+                position = player.actor.Position,
+                euler = player.actor.Euler
+            }
+        end
+        
         -- 获取进入点位置
         local entryPoint = self.entries[playerIndex]
         if not entryPoint then
@@ -112,6 +121,7 @@ function Level:Start()
             player.actor.Euler = entryPoint.Euler
             player:SetCameraView(entryPoint.Euler)
             player:SendChatText("已传送到进入点")
+            player:EnterBattle()
         end
         
         -- 发送战斗开始事件
@@ -215,7 +225,6 @@ function Level:Update()
             end
             if #players > 0 then
                 local randomPlayer = players[math.random(1, #players)]
-                print("设置目标", mob.name, randomPlayer.name)
                 mob:SetTarget(randomPlayer)
             end
         end
@@ -284,16 +293,24 @@ function Level:End(success)
     self.isActive = false
     self.endTime = os.time()
     
-    -- 停止更新任务
     if self.updateTask then
         ServerScheduler.cancel(self.updateTask)
         self.updateTask = nil
     end
 
-    -- 清理场景
+    -- 传送玩家回原始位置
+    for _, player in pairs(self.players) do
+        local originalPos = self.playerOriginalPositions[player.uin]
+        if player.actor and originalPos then
+            player.actor.Position = originalPos.position
+            player.actor.Euler = originalPos.euler
+            player:SetCameraView(originalPos.euler)
+            player:ExitBattle()
+            player:SendChatText("已传送回原位置")
+        end
+    end
+
     self:Cleanup()
-    
-    -- 通知玩家
     for _, player in pairs(self.players) do
         player:SendEvent("BattleEndEvent", {
             levelId = self.levelType.levelId,
@@ -301,7 +318,6 @@ function Level:End(success)
             stars = self.currentStars,
             duration = self.endTime - self.startTime
         })
-        
         player:SendChatText(success and "Level completed!" or "Level failed!")
     end
 end

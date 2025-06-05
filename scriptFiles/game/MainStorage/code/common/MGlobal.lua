@@ -1,16 +1,3 @@
---------------------------------------------------
---- Description：全局变量和函数模块(v109)
---- 提供给其他代码和模块引用
---------------------------------------------------
-local table = table ---@type table
-local native_log = print -- 尽量使用gg.log来输出日志，方便以后重定向
-
-local table_insert = table.insert
-
-local string_find = string.find
-local string_gsub = string.gsub
-local string_sub = string.sub
-local string_len = string.len
 local MainStorage = game:GetService("MainStorage")
 local Vec2 = require(MainStorage.code.common.math.Vec2)
 local Vec3 = require(MainStorage.code.common.math.Vec3)
@@ -422,6 +409,16 @@ local gg = {
 --     return Vector2.New(self.x + x, self.y+y)
 -- end
 
+function gg.ProcessFormula(formula, caster, target)
+    -- 替换所有[变量名]为对应的变量值
+    local processedFormula = formula:gsub("%[(.-)%]", function(varName)
+        local value = target:GetVariable(varName)
+        return tostring(value)
+    end)
+    
+    return gg.eval(processedFormula)
+end
+
 -- 将table以json格式打印
 ---@param t table 要打印的表
 ---@param indent string? 缩进字符串(可选)
@@ -484,7 +481,6 @@ end
 ---@param uin_ number 玩家ID
 ---@return Player|nil 玩家实例
 function gg.getPlayerByUin(uin_)
-    gg.log("gg.getPlayerByUin",gg.server_players_list)
     if gg.server_players_list[uin_] then
         return gg.server_players_list[uin_];
     end
@@ -538,38 +534,6 @@ end
 --     end
 
 -- end
-
--- 服务器获得Npc容器
----@param scene_name_ string 场景名称
----@return SandboxNode Npc容器
-function gg.serverGetContainerNpc(scene_name_)
-    return game.WorkSpace["Ground"][scene_name_].NPC
-end
-
-
-function gg.get_player_gui()
-    return game:GetService('Players').LocalPlayer:WaitForChild('PlayerGui')
-end
-
--- 客户端获得Npc容器
----@return SandboxNode Npc容器
-function gg.clentGetContainerNpc()
-    return game.WorkSpace["Ground"][gg.client_scene_name].NPC
-end
-
--- 服务器获得怪物容器
----@param scene_name_ string 场景名称
----@return SandboxNode 怪物容器
-function gg.serverGetContainerMonster(scene_name_)
-    return game.WorkSpace["Ground"][scene_name_].container_monster
-end
-
----客户端获得Npc容器
----@param scene_name string 场景名称
----@return SandboxNode Npc容器
-function gg.clientGetContainerNpc(scene_name)
-    return game.WorkSpace["Ground"][scene_name].container_npc
-end
 
 -- 客户端获得怪物容器
 ---@return SandboxNode 怪物容器
@@ -836,9 +800,9 @@ end
 ---@param info_ string 打印信息
 function gg.print_table(t, info_)
     if type(t) == 'table' then
-        native_log(info_, ' ' .. gg.table2str(t))
+        print(info_, ' ' .. gg.table2str(t))
     else
-        native_log(info_, ' not table= ', t)
+        print(info_, ' not table= ', t)
     end
 end
 
@@ -896,6 +860,21 @@ function gg.DeepCopy(object)
     return _copy(object)
 end
 
+function gg.GetSceneNode(path)
+    if not path then return nil end
+    
+    -- Split the path by first '/'
+    local sceneName, remainingPath = string.match(path, "([^/]+)/(.+)")
+    if not sceneName then return nil end
+    
+    -- Get the scene using the first part
+    local scene = gg.server_scene_list[sceneName]
+    if not scene then return nil end
+    
+    -- Pass the remaining path to scene:Get()
+    return scene:Get(remainingPath)
+end
+
 -- 打印日志使用
 ---@param ... any 要打印的内容
 function gg.log(...)
@@ -915,7 +894,7 @@ function gg.log(...)
             tab[i] = tostring(v)
         end
     end
-    native_log(table.concat(tab, ' '))
+    print(table.concat(tab, ' '))
 end
 
 -- 快速判断一个xyz的每个轴距都在len的范围内

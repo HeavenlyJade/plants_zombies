@@ -1,188 +1,184 @@
 local MainStorage = game:GetService('MainStorage')
 local gg = require(MainStorage.code.common.MGlobal) ---@type gg
 local Vec3 = require(MainStorage.code.common.math.Vec3)
+local Vec2 = require(MainStorage.code.common.math.Vec2)
 local Perlin = require(MainStorage.code.common.math.PerlinNoise)
 local ClientEventManager = require(MainStorage.code.client.event.ClientEventManager) ---@type ClientEventManager
+local ClientScheduler = require(MainStorage.code.client.ClientScheduler)
+
+local shaking = {}
+
+-- 震动模式定义
+local ShakeModes = {
+    SINE = "震荡",      -- 正弦波震动
+    PERLIN = "柏林噪声",  -- 柏林噪声震动
+    RANDOM = "随机",  -- 随机震动
+    -- 可以在这里添加更多模式
+}
+
+-- 衰减模式定义
+local DropStyles = {
+    LINEAR = "线性",      -- 线性衰减
+    QUADRATIC = "二次方",  -- 二次方衰减（先快后慢）
+    CUBIC = "三次方",     -- 三次方衰减（先快后慢）
+    INV_QUADRATIC = "反二次方", -- 反二次方衰减（先慢后快）
+    INV_CUBIC = "反三次方",    -- 反三次方衰减（先慢后快）
+}
+
+-- 衰减模式实现
+local DropStyleImplementations = {
+    [DropStyles.LINEAR] = function(progress)
+        return 1 - progress
+    end,
+    
+    [DropStyles.QUADRATIC] = function(progress)
+        return (1 - progress) * (1 - progress)
+    end,
+    
+    [DropStyles.CUBIC] = function(progress)
+        return (1 - progress) * (1 - progress) * (1 - progress)
+    end,
+    
+    [DropStyles.INV_QUADRATIC] = function(progress)
+        return 1 - (progress * progress)
+    end,
+    
+    [DropStyles.INV_CUBIC] = function(progress)
+        return 1 - (progress * progress * progress)
+    end,
+}
+
+-- 震动模式实现
+local ShakeModeImplementations = {
+    [ShakeModes.SINE] = function(elapsed, frequency, strength)
+        return math.sin(elapsed * frequency * math.pi * 2) * strength
+    end,
+    
+    [ShakeModes.PERLIN] = function(elapsed, frequency, strength)
+        return (Perlin.Noise2D(elapsed * frequency, 0) - 0.5) * 2 * strength
+    end,
+    
+    [ShakeModes.RANDOM] = function(elapsed, frequency, strength)
+        return (math.random() - 0.5) * 2 * strength
+    end,
+}
+
+---@class ShakeAnim:Class
+local ShakeAnim = ClassMgr.Class("ShakeAnim")
+
+function ShakeAnim:OnInit(data)
+    self.startTime = os.clock()
+    self.duration = data.dura
+    self.frequency = data.frequency or 10
+    self.mode = data.mode or ShakeModes.SINE
+    self.drop = data.drop or DropStyles.LINEAR
+    self.initialPosShake = Vector3.New(data.posShake[1], data.posShake[2], data.posShake[3])
+    self.initialRotShake = Vector2.New(data.rotShake[1], data.rotShake[2])
+    self.posShake = Vector3.New(0,0,0)
+    self.rotShake = Vector2.New(0,0)
+    self.initialStrength = data.strength or 1
+    
+    -- 获取震动模式实现
+    local shakeFunction = ShakeModeImplementations[self.mode]
+    if not shakeFunction then
+        warn("Unknown shake mode:", self.mode, "falling back to sine mode")
+        shakeFunction = ShakeModeImplementations[ShakeModes.SINE]
+    end
+    
+    -- 获取衰减模式实现
+    local dropFunction = DropStyleImplementations[self.drop]
+    if not dropFunction then
+        warn("Unknown drop style:", self.drop, "falling back to linear")
+        dropFunction = DropStyleImplementations[DropStyles.LINEAR]
+    end
+    
+    -- 使用ClientScheduler注册更新任务
+    self.taskId = ClientScheduler.add(function()
+        local elapsed = os.clock() - self.startTime
+        if elapsed >= self.duration then
+            -- 移除震动动画
+            for i, shake in ipairs(shaking) do
+                if shake == self then
+                    table.remove(shaking, i)
+                    break
+                end
+            end
+            return
+        end
+        
+        -- 计算当前强度（使用选定的衰减模式）
+        local progress = elapsed / self.duration
+        local currentStrength = self.initialStrength * dropFunction(progress)
+        
+        -- 使用选定的震动模式计算震动值
+        local shakeValue = shakeFunction(elapsed, self.frequency, currentStrength)
+        print("shakeValue", shakeValue, currentStrength)
+        
+        -- 更新震动值
+        self.posShake = self.initialPosShake * shakeValue
+        self.rotShake = self.initialRotShake * shakeValue
+    end, 0, 1/30) -- 每帧更新一次（30fps）
+end
+
+function ShakeAnim:OnDestroy()
+    if self.taskId then
+        ClientScheduler.cancel(self.taskId)
+        self.taskId = nil
+    end
+end
 
 ---@class ShakeController
 local ShakeController = {}
 
---震动数据
-local ShakeData = {
-    --震动持续时间
-    duration = 1.0,
-    --震动频率
-    frequency = 0.05,
-    --强度
-    strength = 1.0,
-    --旋转参数
-    rotX = 0.0,
-    rotY = 0.0,
-    rotZ = 0.0,
-    --位移参数
-    posX = 0.0,
-    posY = 0.0,
-    posZ = 0.0,
-    --运行状态
-    loop = false,
-    stop = false,
-    stopfade = false,
-    elapsedtime = 0.0,
-    rotDelta = nil,
-    posDelta = nil,
-    randSeed = nil
-}
+-- 添加新的震动模式
+function ShakeController.AddShakeMode(modeName, implementation)
+    if ShakeModes[modeName] then
+        warn("Shake mode already exists:", modeName)
+        return
+    end
+    ShakeModes[modeName] = modeName
+    ShakeModeImplementations[modeName] = implementation
+end
 
---静态变量
-local _shakeDatas = {}
-local _shaking = false
-local _shakePosDelta = Vec3.new(0, 0, 0)
-local _shakeRotDelta = Vec3.new(0, 0, 0)
+-- 添加新的衰减模式
+function ShakeController.AddDropStyle(styleName, implementation)
+    if DropStyles[styleName] then
+        warn("Drop style already exists:", styleName)
+        return
+    end
+    DropStyles[styleName] = styleName
+    DropStyleImplementations[styleName] = implementation
+end
 
 ClientEventManager.Subscribe("ShakeCamera", function(evt)
-    _shakeDatas[evt.name] = evt
-    evt._posShake = evt.posX ~= 0.0 or evt.posY ~= 0.0 or evt.posZ ~= 0.0
-    evt._rotShake = evt.rotX ~= 0.0 or evt.rotY ~= 0.0 or evt.rotZ ~= 0.0
-    ShakeController.Start(evt.name)
+    table.insert(shaking, ShakeAnim.New(evt))
 end)
 
---震动屏幕
-function ShakeController.Start(name)
-    if not _shakeDatas[name] then
-        return
-    end
-    _shakeDatas[name].stop = false
-    _shakeDatas[name].loop = false
-    _shakeDatas[name]._times = 0
-    _shakeDatas[name].elapsedtime = 0.0
-    _shakeDatas[name].posDelta = Vec3.new(0, 0, 0)
-    _shakeDatas[name].rotDelta = Vec3.new(0, 0, 0)
-    _shakeDatas[name].randSeed = gg.math.Random(0, 36)
-end
-
---开始持续震动
-function ShakeController.StartLoop(name)
-    if not _shakeDatas[name] then
-        return
-    end
-    _shakeDatas[name].stop = false
-    _shakeDatas[name].loop = true
-    _shakeDatas[name].elapsedtime = 0.0
-    _shakeDatas[name].posDelta = Vec3.new(0, 0, 0)
-    _shakeDatas[name].rotDelta = Vec3.new(0, 0, 0)
-    _shakeDatas[name].randSeed = gg.math.Random(0, 36)
-end
-
---停止持续震动
-function ShakeController.StopLoop(name)
-    if not _shakeDatas[name] then
-        return
-    end
-    _shakeDatas[name].loop = false
-end
-
---淡出震动
-function ShakeController.StopFade(name)
-    if not _shakeDatas[name] then
-        return
-    end
-    _shakeDatas[name].stopfade = true
-    _shakeDatas[name].loop = false
-end
-
---停止震动
-function ShakeController.Stop(name)
-    _shakeDatas[name].stop = true
-    _shakeDatas[name].loop = false
-end
-
---停止全部
-function ShakeController.StopAll()
-    for name, shakeData in pairs(_shakeDatas) do
-        shakeData.stop = true
-        shakeData.loop = false
-    end
-end
-
-function ShakeController.Update(dt)
-    _shakeRotDelta = Vec3.new(0, 0, 0)
-    _shakePosDelta = Vec3.new(0, 0, 0)
-
-    _shaking = false
-    for name, shakeData in pairs(_shakeDatas) do
-        if not shakeData.stop then
-            _shaking = true
-            --进行震动
-            ShakeController.Shake(shakeData, dt)
-            _shakePosDelta = _shakePosDelta + shakeData.posDelta
-            _shakeRotDelta = _shakeRotDelta + shakeData.rotDelta
-        end
-    end
-end
-
---震动屏幕
-function ShakeController.Shake(shakeData, dt)
-    local function Noise2D(x, y)
-        return Perlin:StaticNoise2D(x, y)
-    end
-    if not shakeData.stop and shakeData.elapsedtime < shakeData.duration then
-        --执行震动
-        shakeData.elapsedtime = shakeData.elapsedtime + dt
-
-        local progress = shakeData.elapsedtime / shakeData.duration
-        local strength = shakeData.strength * progress -- 线性衰减
-
-        if shakeData._rotShake then
-            local rx = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 0.0) - 0.5
-            local ry = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 1.0) - 0.5
-            local rz = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 2.0) - 0.5
-            shakeData.rotDelta =
-                Vec3.new(rx, ry, rz) * Vec3.new(shakeData.rotX, shakeData.rotY, shakeData.rotZ) * strength
-        end
-        if shakeData._posShake then
-            local px = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 3.0) - 0.5
-            local py = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 4.0) - 0.5
-            local pz = Noise2D(shakeData.elapsedtime * shakeData.frequency, shakeData.randSeed + 5.0) - 0.5
-            shakeData.posDelta =
-                Vec3.new(px, py, pz) * Vec3.new(shakeData.posX, shakeData.posY, shakeData.posZ) * strength
-        end
-
-        if shakeData.stopfade then
-            shakeData.duration = shakeData.elapsedtime + 1.0
-            shakeData.stopfade = false
-        end
-    elseif shakeData.times then
-        shakeData._times = shakeData._times + 1
-        if shakeData._times >= shakeData.times then
-            shakeData.stop = true
-        else
-            shakeData.elapsedtime = 0.0
-        end
-    else
-        --震动完毕
-        if shakeData.loop then
-            shakeData.stop = false
-            shakeData.elapsedtime = 0.0
-        else
-            shakeData.stop = true
-        end
-    end
-end
+local _shakeRotDelta = Vec2.new(0, 0)
+local _shakePosDelta = Vec3.new(0, 0, 0)
 
 --是否正在震动
 function ShakeController.IsShaking()
-    return _shaking
+    return #shaking > 0
 end
 
 --获取震动位移
 ---@return Vec3
 function ShakeController.GetPosDelta()
+    _shakePosDelta = Vec3.new(0, 0, 0)
+    for name, shakeData in pairs(shaking) do
+        _shakePosDelta = _shakePosDelta + shakeData.posShake
+    end
     return _shakePosDelta
 end
 
 --获取震动旋转
----@return Vec3
+---@return Vec2
 function ShakeController.GetRotDelta()
+    _shakeRotDelta = Vec2.new(0, 0)
+    for name, shakeData in pairs(shaking) do
+        _shakeRotDelta = _shakeRotDelta + shakeData.rotShake
+    end
     return _shakeRotDelta
 end
 

@@ -1,15 +1,3 @@
-local SandboxNode = SandboxNode
-local Vector3 = Vector3
-local Enum = Enum
-local math = math
-local Vector2 = Vector2
-local ColorQuad = ColorQuad
-local wait = wait
-local game = game
-local pairs = pairs
-local coroutine = coroutine
-local next = next
-
 local MainStorage = game:GetService("MainStorage")
 local gg = require(MainStorage.code.common.MGlobal) ---@type gg
 local common_const = require(MainStorage.code.common.MConst) ---@type common_const
@@ -49,6 +37,8 @@ local TRIGGER_STAT_TYPES = {
 ---@field isRespawning boolean 是否正在复活
 ---@field New fun( info_:table ):Entity
 local _M = ClassMgr.Class("Entity") -- 父类 (子类： Player, Monster )
+_M.node2Entity = {}
+
 _M.TRIGGER_STAT_TYPES = TRIGGER_STAT_TYPES
 -- 新增属性
 function _M:OnInit(info_)
@@ -119,9 +109,12 @@ function _M:OnInit(info_)
         } -- monster melee
     }
     self.modelPlayer = nil  ---@type ModelPlayer
-
-    -- 描边效果计时器
     self.outlineTimer = nil
+end
+
+function _M:SetActor(actor)
+    self.actor = actor
+    _M.node2Entity[actor] = self
 end
 
 ---@protected
@@ -134,6 +127,12 @@ function _M:SubscribeEvent(eventType, listener, priority)
 end
 
 
+function _M:SetModel(model, animator, stateMachine)
+    self.actor.ModelId = model
+    self.actor["Animator"].ControllerAsset = animator
+    self:SetAnimationController(stateMachine)
+end
+
 function _M:GetSize()
     local size = self.actor.Size
     local scale = self.actor.LocalScale
@@ -141,25 +140,33 @@ function _M:GetSize()
 end
 
 function _M:SetAnimationController(name)
-    local AnimationConfig = require(MainStorage.code.common.config.AnimationConfig) ---@type AnimationConfig
-    local ModelPlayer = require(MainStorage.code.server.graphic.ModelPlayer) ---@type ModelPlayer
-    local animator = self.actor.Animator
-    local animationConfig = AnimationConfig.Get(name)
-    if animator and animationConfig then
-        self.modelPlayer = ModelPlayer.New(animator, animationConfig)
-        self.actor.Walking:Connect(function(isWalking)
-            if isWalking then
-                self.modelPlayer:OnWalk()
-            end
-        end)
-        self.actor.Standing:Connect(function(isStanding)
-            if isStanding then
-                self.modelPlayer:OnStand()
-            end
-        end)
-        self.actor.Died:Connect(function()
-            self.modelPlayer:OnDead()
-        end)
+    if self.modelPlayer and self.modelPlayer.name == name then
+        return
+    end
+    if self.modelPlayer then
+        self.modelPlayer.walkingTask:Disconnect()
+        self.modelPlayer.standingTaskId:Disconnect()
+        self.modelPlayer = nil
+    end
+    if name then
+        local AnimationConfig = require(MainStorage.code.common.config.AnimationConfig) ---@type AnimationConfig
+        local ModelPlayer = require(MainStorage.code.server.graphic.ModelPlayer) ---@type ModelPlayer
+        local animator = self.actor.Animator
+        local animationConfig = AnimationConfig.Get(name)
+        if animator and animationConfig then
+            self.modelPlayer = ModelPlayer.New(name, animator, animationConfig)
+            self.modelPlayer.walkingTask = self.actor.Walking:Connect(function(isWalking)
+                if isWalking then
+                    self.modelPlayer:OnWalk()
+                end
+            end)
+            self.modelPlayer.standingTaskId = self.actor.Standing:Connect(function(isStanding)
+                if isStanding then
+                    self.modelPlayer:OnStand()
+                end
+            end)
+            print("SetAnimationController", name)
+        end
     end
 end
 
@@ -232,7 +239,7 @@ function _M:RebuildTagHandlers()
             -- 如果有多个处理器，按优先级排序
             if #self.tagHandlers[key] > 1 then
                 table.sort(self.tagHandlers[key], function(a, b)
-                    return a.handlers[key][1].priority < b.handlers[key][1].priority
+                    return a.handlers[key][1]["优先级"] < b.handlers[key][1]["优先级"]
                 end)
             end
         end
@@ -685,7 +692,11 @@ function _M:DestroyObject()
         self:Die()
     end
     self.deleted = true
-    self.actor:Destroy()
+    if self.actor then
+        _M.node2Entity[self.actor] = nil
+        self.actor:Destroy()
+        self.actor = nil
+    end
     ServerEventManager.UnsubscribeByKey(self.uuid)
 end
 
@@ -751,22 +762,22 @@ function _M:addExp(exp_)
     self.exp = self.exp + exp_
 
     local save_flag_ = false
-    if common_config.expLevelUp[self.level + 1] then
-        -- 是否升级
-        if self.exp >= common_config.expLevelUp[self.level + 1] then
-            self.level = self.level + 1
-            self:resetBattleData(true)
-            save_flag_ = true
+    -- if common_config.expLevelUp[self.level + 1] then
+    --     -- 是否升级
+    --     if self.exp >= common_config.expLevelUp[self.level + 1] then
+    --         self.level = self.level + 1
+    --         self:resetBattleData(true)
+    --         save_flag_ = true
 
-            gg.log('addExp levelUp:', self.exp, self.level)
-            self:showDamage(0, {
-                levelup = self.level
-            }, self)
+    --         gg.log('addExp levelUp:', self.exp, self.level)
+    --         self:showDamage(0, {
+    --             levelup = self.level
+    --         }, self)
 
-            -- 展示特效
-            self:showReviveEffect(self:GetPosition())
-        end
-    end
+    --         -- 展示特效
+    --         self:showReviveEffect(self:GetPosition())
+    --     end
+    -- end
 
     cloudDataMgr.SavePlayerData(self.uin, save_flag_) -- 加经验存盘
 end
@@ -816,7 +827,7 @@ end
 function _M:showDamage(number_, eff_, victim)
     -- 无伤害，无特殊效果
     local victimPosition = victim:GetCenterPosition()
-    local position =victimPosition + ( self:GetCenterPosition() - victimPosition):Normalize() * victim:GetSize().x
+    local position =victimPosition + ( self:GetCenterPosition() - victimPosition):Normalize()*2 * victim:GetSize().x
     if self._attackCache == 0 then
         self._attackCache = self:GetStat("攻击")
     end
@@ -826,7 +837,7 @@ function _M:showDamage(number_, eff_, victim)
         isCrit = eff_.cr == 1,
         position = {
             x = position.x,
-            y = position.y,
+            y = position.y + victim:GetSize().y,
             z = position.z
         },
         percent = 0.3 * number_ / self._attackCache
@@ -881,7 +892,6 @@ function _M:ChangeScene(new_scene)
     if type(new_scene) == "string" then
         new_scene = gg.server_scene_list[new_scene]
     end
-    gg.log("ChangeScene", self.scene, new_scene)
     if self.scene and self.scene == new_scene then
         return
     end
@@ -909,9 +919,6 @@ function _M:ChangeScene(new_scene)
     if self.isPlayer then
         new_scene:player_enter(self.uin)
     end
-
-    gg.log(new_scene.name, ' player_enter====', self.uin)
-
 end
 
 
@@ -944,21 +951,19 @@ end
 
 -- 展示复活特效
 function _M:showReviveEffect(pos_)
-    local function thread_wrap()
-        local expl = SandboxNode.new('DefaultEffect', self.actor)
-        expl.AssetID = 'sandboxSysId://particles/item_137_red.ent'
+    local expl = SandboxNode.new('DefaultEffect', self.actor)
+    expl.AssetID = 'sandboxSysId://particles/item_137_red.ent'
 
-        expl.Position = Vector3.New(pos_.x, pos_.y, pos_.z)
-        expl.LocalScale = Vector3.New(3, 3, 3)
-        wait(1.5)
+    expl.Position = Vector3.New(pos_.x, pos_.y, pos_.z)
+    expl.LocalScale = Vector3.New(3, 3, 3)
+    ServerScheduler.add(function()
         expl:Destroy()
-    end
-    gg.thread_call(thread_wrap)
+    end, 1.5)
 end
 
 -- 无法被攻击状态
 function _M:CanBeTargeted()
-    return not self.isDead
+    return not self.isDead and not self.deleted
 end
 
 -- tick刷新

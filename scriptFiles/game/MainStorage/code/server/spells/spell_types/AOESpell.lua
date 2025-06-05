@@ -132,6 +132,7 @@ function PulsingAOE:ExecutePulse()
             print(string.format("%s: 持续效果未命中目标", self.spell.spellName))
         end
     end
+    self.spell:PlayEffect(self.spell.castEffects, self.caster, self.location, self.param, "触发点")
 end
 
 ---@class AOESpell:Spell
@@ -271,6 +272,7 @@ function AOESpell:CastReal(caster, target, param)
             table.insert(log, string.format("%s: 最终位置[%.1f, %.1f, %.1f]", self.spellName, loc.x, loc.y, loc.z))
         end
     end
+    self:PlayEffect(self.castEffects, caster, loc, param)
     
     if self.duration > 0 then
         if self.printInfo then
@@ -284,6 +286,7 @@ function AOESpell:CastReal(caster, target, param)
         return true
     end
     
+    self:PlayEffect(self.castEffects, caster, loc, param, "触发点")
     -- 单次执行的情况
     local hitTargets = self:GetHitTargets(loc, caster, param, log)
     if hitTargets and #hitTargets > 0 then
@@ -295,7 +298,7 @@ function AOESpell:CastReal(caster, target, param)
             end
             for _, hitTarget in ipairs(hitTargets) do
                 if self.printInfo then
-                    table.insert(log, string.format("%s: 对目标[%s]执行子魔法", 
+                    table.insert(log, string.format("%s: 对目标[%s]执行子魔法",
                         self.spellName, hitTarget.name))
                 end
                 for _, subSpell in ipairs(self.subSpells) do

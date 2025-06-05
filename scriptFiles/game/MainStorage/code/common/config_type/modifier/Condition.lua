@@ -2,18 +2,6 @@
 local MainStorage = game:GetService('MainStorage')
 local ClassMgr      = require(MainStorage.code.common.ClassMgr)    ---@type ClassMgr
 
-local CONDITION = {
-    TYPES = {
-        Health = "HealthCondition",
-        Stat = "StatCondition",
-        Position = "PositionCondition",
-        Chance = "ChanceCondition",
-        Variable = "VariableCondition",
-        BuffActive = "BuffActiveCondition",
-        TagLevel = "TagLevelCondition",
-        Shield = "ShieldCondition"
-    }
-}
 
 ---@class Condition
 local Condition = ClassMgr.Class("Condition")
@@ -28,7 +16,6 @@ function BetweenCondition:OnInit(data)
     self.maxValue = data["最大值"] or 100
 end
 function BetweenCondition:CheckAmount(modifier, amount)
-    print(string.format("CheckAmount %f %f %f", self.minValue, self.maxValue, amount))
     return amount >= self.minValue and amount <= self.maxValue
 end
 
@@ -41,12 +28,13 @@ end
 function HealthCondition:Check(modifier, caster, target)
     if target == nil or not target.isEntity then return false end
     local amount
-    local creature = target:GetCreature()
+    local creature = target ---@cast creature Entity
     if self.isPercentage then
         amount = 100 * creature.health / target:GetStat("Health")
     else
         amount = creature.health
     end
+    gg.log("HealthCondition", amount, self.minValue, self.maxValue)
     return self:CheckAmount(modifier, amount)
 end
 
@@ -58,7 +46,7 @@ function VariableCondition:OnInit(data)
 end
 function VariableCondition:Check(modifier, caster, target)
     if not target.isEntity then return false end
-    local creature = target:GetCreature()
+    local creature = target ---@cast creature Entity
     local amount = creature:GetVariable(self.name)
     return self:CheckAmount(modifier, amount)
 end
@@ -98,7 +86,7 @@ function BuffActiveCondition:OnInit(data)
 end
 function BuffActiveCondition:Check(modifier, caster, target)
     if not target.isEntity then return false end
-    local creature = target:GetCreature()
+    local creature = target ---@cast creature Entity
     
     if self.buffKeyword == nil or self.buffKeyword == "" then
         local totalStacks = 0
@@ -125,7 +113,7 @@ function TagLevelCondition:OnInit(data)
 end
 function TagLevelCondition:Check(modifier, caster, target)
     if target == nil or not target.isEntity then return false end
-    local targetCreature = target:GetCreature()
+    local targetCreature = target ---@cast creature Entity
     print(string.format("TagLevelCondition %s %s %s", targetCreature.name, self.tagName, table.concat(targetCreature.tagIds, ",")))
     local tag = targetCreature:GetTag(self.tagName)
     if tag ~= nil then
@@ -144,7 +132,7 @@ end
 function ShieldCondition:Check(modifier, caster, target)
     if target == nil or not target.isEntity then return false end
     local amount
-    local creature = target:GetCreature()
+    local creature = target ---@cast creature Entity
     if self.isPercentage then
         amount = 100 * creature.shield / target:GetStat("Health")
     else

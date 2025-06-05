@@ -1,16 +1,5 @@
---- nnpc
-
-local setmetatable = setmetatable
-local SandboxNode  = SandboxNode
-local Vector3      = Vector3
-local ColorQuad    = ColorQuad
-local game         = game
-
-
 local MainStorage        = game:GetService("MainStorage")
 local gg                 = require(MainStorage.code.common.MGlobal) ---@type gg
-local common_config      = require(MainStorage.code.common.MConfig) ---@type common_config
-local common_const       = require(MainStorage.code.common.MConst) ---@type common_const
 local ClassMgr           = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
 local Modifiers          = require(MainStorage.code.common.config_type.modifier.Modifiers) ---@type Modifiers
 local Entity             = require(MainStorage.code.server.entity_types.Entity) ---@type Entity
@@ -32,10 +21,11 @@ function _M:OnInit(npcData, actor)
     self.interactCondition = Modifiers.New(npcData["互动条件"])
     self.interactCommands  = npcData["互动指令"]
     self.interactIcon      = npcData["互动图标"]
+    self.extraSize      = gg.Vec2.new(npcData["额外互动距离"]) or gg.Vec2.new(0,0)
     self.target            = nil
     actor.CollideGroupID   = 1
     if npcData["状态机"] then
-        self:SetAnimationController(npcData["状态机"]) 
+        self:SetAnimationController(npcData["状态机"])
     end
     -- self:setupNpcInteraction(actor, self.name)
     local trigger         = SandboxNode.new('TriggerBox', actor) ---@type TriggerBox
@@ -44,16 +34,15 @@ function _M:OnInit(npcData, actor)
 
     -- 设置触发器尺寸，在NPC模型周围扩展一定范围
     trigger.LocalPosition = actor.Center
-    trigger.Size          = Vector3.New(400 + math.max(npcSize.x, npcSize.z), 200, 400 + math.max(npcSize.x, npcSize.z))                                                               -- 扩展范围
+    gg.log("extraSize", self.extraSize, npcData["额外互动距离"])
+    trigger.Size = Vector3.New(self.extraSize.x + npcSize.x, 200, self.extraSize.y + npcSize.z)                                                               -- 扩展范围
 
     -- 监听触发器被触碰
     trigger.Touched:Connect(function(node)
-        -- print("Touched", self.name, node.Name)
         if node and node.UserId then
             local player = gg.getPlayerByUin(node.UserId)
             if player then
                 self:SetTarget(player)
-                -- 将NPC添加到玩家的附近NPC列表中
                 player:AddNearbyNpc(self)
             end
         end
@@ -77,7 +66,6 @@ function _M:OnInit(npcData, actor)
     ServerEventManager.Subscribe("InteractWithNpc", function(evt)
         local player = evt.player
         local npcId = evt.npcId
-        gg.log("InteractWithNpc", self.name, self.uuid, player.name, player.uuid)
         -- 查找NPC
         if self.uuid == npcId then
             -- 检查玩家是否在NPC附近

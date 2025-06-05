@@ -25,7 +25,6 @@ function UiBag:OnInit(node, config)
     
     ClientEventManager.Subscribe("SyncInventoryItems", function(evt)
         local evt = evt ---@type SyncInventoryItems
-        gg.log("SyncInventoryItems", evt)
         for slot, itemData in pairs(evt.items) do
             if not self.items[slot.c] then
                 self.items[slot.c] = {}

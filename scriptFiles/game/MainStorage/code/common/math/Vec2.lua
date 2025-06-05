@@ -12,8 +12,13 @@ function Vec2.new(x, y)
         return nil
     end
     if type(x) == "table" then
-        obj.x = x[1] or 0
-        obj.y = x[2] or 0
+        if x.x then
+            obj.x = x.x
+            obj.y = x.y
+        else
+            obj.x = x[1] or 0
+            obj.y = x[2] or 0
+        end
     elseif type(x) == "number" then
         obj.x = x or 0
         obj.y = y or 0

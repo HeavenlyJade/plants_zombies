@@ -18,6 +18,13 @@ function AcceptedQuest:IsCompleted()
     return self:GetProgress() >= self.quest.completionCount
 end
 
+function AcceptedQuest:GetToStringParams()
+    return {
+        name = self.quest.name,
+        count = self:GetProgress()
+    }
+end
+
 ---@param amount number
 function AcceptedQuest:AddProgress(amount)
     if self:IsCompleted() or self.quest.questType ~= "无类型" then
@@ -57,6 +64,10 @@ function AcceptedQuest:Finish()
             self.player.bag:AddItem(item)
         end
     end
+
+    if self.quest.completionCommands then
+        self.player:ExecuteCommands(self.quest.completionCommands)
+    end
     
     -- 发放邮件奖励
     if self.quest.mailRewards then
@@ -93,9 +104,6 @@ end
 function AcceptedQuest:GetQuestDesc()
     local title = self.quest.shortDesc
     local progress = self:GetProgress()
-    if self.quest.showProgress and self.quest.completionCount > 0 then
-        title = string.format("%s (%d/%d)", title, progress, self.quest.completionCount)
-    end
     return {
         name = self.quest.name,
         description = title,

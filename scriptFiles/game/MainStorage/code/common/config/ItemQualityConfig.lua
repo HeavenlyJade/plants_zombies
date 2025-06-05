@@ -9,7 +9,7 @@ function ItemQuality:onInit(data)
     self.name = data["名字"]
     self.multiplier = data["倍率"] ---@type number
     self.weight = data["比重"] ---@type number
-    self.priority = data["优先级"] ---@type number
+    self.priority = data["优先级"] or 0 ---@type number
 end
 
 --- 物品品质配置文件

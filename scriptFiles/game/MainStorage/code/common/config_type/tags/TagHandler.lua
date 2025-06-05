@@ -16,8 +16,7 @@ function TagHandler:OnInit( data )
     self["冷却"] = data["冷却"] ---@type number
     self["每级增强"] = data["每级增强"] ---@type number
     self["几率"] = data["几率"] ---@type number
-    self["自身条件"] = data["自身条件"] ---@type Modifiers
-    self["目标条件"] = data["目标条件"] ---@type Modifiers
+    self["条件"] = data["条件"] ---@type Modifiers
     self["升级增加数值"] = {} ---@type table<string, number>
     if data["升级增加数值"] then
         for _, upgrade in ipairs(data["升级增加数值"]) do
@@ -63,32 +62,14 @@ function TagHandler:CanTrigger(caster, target, param, log)
         return false
     end
     
-    if #self["自身条件"].modifiers > 0 then
-        for i, item in ipairs(self["自身条件"].modifiers) do
-            local stop = item:Check(caster, caster, param)
+    if self["条件"] then
+        for i, item in ipairs(self["条件"].modifiers) do
+            local stop = item:Check(caster, target, param)
             if stop then break end
             if param.cancelled then
                 if self.printMessage then 
                     table.insert(log, string.format("%s.%s触发失败：第%d个自身条件不满足 条件=%s", self.m_tagType.id, self.m_tagIndex, i+1, item.condition.condition))
                 end
-                break
-            end
-        end
-    end
-    
-    if param.cancelled then
-        if self.printMessage then 
-            table.insert(log, string.format("%s.%s触发失败：自身条件检查后被取消", self.m_tagType.id, self.m_tagIndex))
-        end
-        return false
-    end
-    
-    if #self["目标条件"].modifiers > 0 then
-        for i, item in ipairs(self["目标条件"].modifiers) do
-            local stop = item:Check(caster, target, param)
-            if stop then break end
-            if param.cancelled then
-                table.insert(log, string.format("%s.%s触发失败：第%d个目标条件不满足 条件=%s", self.m_tagType.id, self.m_tagIndex, i+1, item.condition.condition))
                 break
             end
         end

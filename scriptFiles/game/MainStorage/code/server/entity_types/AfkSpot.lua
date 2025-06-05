@@ -9,12 +9,12 @@ local gg = require(MainStorage.code.common.MGlobal) ---@type gg
 ---@field interval number 间隔时间
 ---@field spells table 定时释放魔法列表
 ---@field lastCastTime number 上次释放时间
----@field activePlayer Player|nil 当前激活的玩家
----@field timerId number|nil 定时器ID
+---@field activePlayers table<Player, number> 当前激活的玩家及其定时器ID
 local AfkSpot = ClassMgr.Class("AfkSpot", Npc)
 
 function AfkSpot:OnInit(data, actor)
     Npc.OnInit(self, data, actor)
+    self.autoInteract = data["自动互动"] or false
     self.interval = data["间隔时间"] or 10
     self.subSpells = {}
     if data["定时释放魔法"] then
@@ -24,8 +24,13 @@ function AfkSpot:OnInit(data, actor)
         end
     end
     self.lastCastTime = 0
-    self.activePlayer = nil
-    self.timerId = nil
+    self.activePlayers = {}
+    
+    self:SubscribeEvent("ExitAfkSpot", function (evt)
+        if evt.player then
+            self:OnPlayerExit(evt.player)
+        end
+    end)
 end
 
 --- 检查是否可以进入挂机点
@@ -40,27 +45,45 @@ end
 --- 玩家进入挂机点
 ---@param player Player 玩家
 function AfkSpot:OnPlayerEnter(player)
-    -- 传送玩家到挂机点位置
-    local pos = self.actor.Position
-    player:SetPosition(pos)
+    player:SetMoveable(false)
+    -- 发送挂机收益事件给客户端
+    player:SendEvent("AfkSpotEntered", {
+        rewardsPerSecond = player:GetVariable("每秒收益_"..self.name),
+        interval = self.interval
+    })
     
     -- 开始定时释放魔法
     self:StartSpellTimer(player)
+end
+
+--- 玩家退出挂机点
+---@param player Player 玩家
+function AfkSpot:OnPlayerExit(player)
+    -- 停止该玩家的定时器
+    local timerId = self.activePlayers[player]
+    if timerId then
+        ServerScheduler.cancel(timerId)
+        self.activePlayers[player] = nil
+        player:SetMoveable(true)
+    end
 end
 
 --- 开始定时释放魔法
 ---@param player Player 玩家
 function AfkSpot:StartSpellTimer(player)
     -- 停止之前的定时器
-    if self.timerId then
-        ServerScheduler.cancel(self.timerId)
-        self.timerId = nil
+    local oldTimerId = self.activePlayers[player]
+    if oldTimerId then
+        ServerScheduler.cancel(oldTimerId)
     end
     
     -- 创建新的定时器
-    self.timerId = ServerScheduler.add(function()
+    local timerId = ServerScheduler.add(function()
         self:CastSpells(player)
     end, 0, self.interval) -- 立即开始，每隔interval秒执行一次
+    
+    -- 保存定时器ID
+    self.activePlayers[player] = timerId
 end
 
 --- 释放魔法
@@ -79,28 +102,20 @@ function AfkSpot:HandleInteraction(player)
     
     -- 检查是否可以进入挂机点
     if self:CanEnter(player) then
-        self.activePlayer = player
         self:OnPlayerEnter(player)
     end
 end
 
 --- 更新NPC状态
 function AfkSpot:update_npc()
-    -- 如果有激活的玩家，检查是否离开范围
-    if self.activePlayer then
-        local pos = self.actor.Position
-        local playerPos = self.activePlayer:GetPosition()
+    -- 检查所有激活的玩家是否离开范围
+    local pos = self.actor.Position
+    for player, _ in pairs(self.activePlayers) do
+        local playerPos = player:GetPosition()
         if gg.fast_out_distance(pos, playerPos, 200) then
-            -- 玩家离开范围，停止定时器
-            if self.timerId then
-                ServerScheduler.cancel(self.timerId)
-                self.timerId = nil
-            end
-            self.activePlayer = nil
+            self:OnPlayerExit(player)
         end
     end
-    
-    -- 调用父类的更新
     -- Npc.update_npc(self)
 end
 

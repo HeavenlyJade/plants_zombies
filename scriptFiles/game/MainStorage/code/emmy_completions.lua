@@ -399,8 +399,8 @@
 ---@field SetWorldPosition fun(self: Transform, x: number, y: number, z: number) None 设置全局位置
 ---@field SetWorldScale fun(self: Transform, x: number, y: number, z: number) None 设置全局缩放
 ---@field SetWorldEuler fun(self: Transform, x: number, y: number, z: number) None 设置全局欧拉角
----@field LookAt fun(self: Transform, x: Vector3, y: boolean) None 看向指定位置
----@field LookAtObject fun(self: Transform, x: SceneTransObject, y?: boolean) None 看向指定位置
+---@field LookAt fun(self: Transform, pos: Vector3, y: boolean) None 看向指定位置
+---@field LookAtObject fun(self: Transform, x: Transform, y?: boolean) None 看向指定位置
 
 
 ---@class BindAttachment
@@ -2913,7 +2913,7 @@
 
 
 ---@class TweenInfo
----@field New TweenInfo 构造
+---@field New fun(duration:number, style?:EasingStyle, direction?:EasingDirection, delayTime?:number, repeatCount?:number, reverse?:boolean) TweenInfo 构造
 ---@field EasingDirection number 缓动方向
 ---@field Time number 缓动时间
 ---@field DelayTime number 延迟时间
@@ -4413,6 +4413,7 @@ Vector4 = {} ---@type Vector4
 ---@field FillMethod FillMethod
 ---@field CameraType CameraType
 ---@field EasingStyle EasingStyle
+---@field EasingDirection EasingDirection
 ---@field NodeSyncMode NodeSyncMode
 ---@field CameraModel CameraModel
 Enum = {} ---@type Enum

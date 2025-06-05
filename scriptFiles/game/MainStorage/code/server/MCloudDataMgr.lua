@@ -67,11 +67,6 @@ function MCloudDataMgr.SaveSkillData( uin_ )
         }
 
         cloudService:SetTableAsync( 'sk' .. uin_, data_, function ( ret_ )
-            if  not ret_ then
-                gg.log("保存玩家技能失败", 'sk' .. uin_, data_ )
-            else
-                gg.log("保存玩家技能成功", 'sk' .. uin_, data_ )
-            end
         end )
     end
 end
@@ -115,13 +110,9 @@ function MCloudDataMgr.SavePlayerData( uin_,  force_ )
             uin   = uin_,
             exp   = player_.exp,
             level = player_.level,
+            vars = player_.variables
         }
         cloudService:SetTableAsync( 'pd' .. uin_, data_, function ( ret_ )
-            if  not ret_ then
-                gg.log("保持玩家当前等级和经验失败", 'pd' .. uin_, data_ )
-            else
-                gg.log("保持玩家当前等级和经验", 'pd' .. uin_, data_ )
-            end
         end )
     end
 end
@@ -153,8 +144,8 @@ function MCloudDataMgr.ReadGameTaskData(player)
         if ret2_ and ret2_.uin == player.uin then
             -- 重建任务
             for questId, questData in pairs(ret2_.quests) do
-                local Quest = require(MainStorage.code.common.config_type.Quest)
-                local quest = Quest.New(questId)  -- 从配置创建任务
+                local QuestConfig = require(MainStorage.code.common.config.QuestConfig) ---@type QuestConfig
+                local quest = QuestConfig.Get(questId)  ---@type Quest
                 if quest then
                     local AcceptedQuest = require(MainStorage.code.server.entity_types.player_data.AcceptedQuest)
                     local acceptedQuest = AcceptedQuest.New(quest, player)
@@ -191,11 +182,6 @@ function MCloudDataMgr.SaveGameTaskData(player)
     }
 
     cloudService:SetTableAsync('game_task' .. player.uin, data_, function(ret_)
-        if not ret_ then
-            gg.log("保存玩家任务失败", 'game_task' .. player.uin, data_)
-        else
-            gg.log("保存玩家任务成功", 'game_task' .. player.uin, data_)
-        end
     end)
 end
 
@@ -214,11 +200,6 @@ function MCloudDataMgr.SaveSkillConfig(player)
         }
     end
     cloudService:SetTableAsync( 'sk' .. player.uin, skillData, function ( ret_ )
-        if  not ret_ then
-            gg.log("保存玩家技能失败", 'sk' .. player.uin, skillData )
-        else
-            gg.log("保存玩家技能成功", 'sk' .. player.uin, skillData )
-        end
     end )
 end
 return MCloudDataMgr

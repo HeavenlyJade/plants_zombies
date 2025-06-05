@@ -13,7 +13,6 @@ local uiConfig = {
     uiName = "HudInteract",
     layer = 0,
     hideOnInit = false, -- 初始隐藏，当玩家靠近NPC时显示
-    initHudInteract = false
 }
 
 ---@param viewButton ViewButton

@@ -1,6 +1,5 @@
 local MainStorage   = game:GetService("MainStorage")
 local gg            = require(MainStorage.code.common.MGlobal) ---@type gg
-local common_config = require(MainStorage.code.common.MConfig) ---@type common_config
 local common_const  = require(MainStorage.code.common.MConst) ---@type common_const
 local ClassMgr  = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
 -- local TaskSystem = require(MainStorage.code.server.TaskSystem.MTaskSystem) ---@type TaskSystem
@@ -26,6 +25,7 @@ local Level = require(MainStorage.code.server.Scene.Level) ---@type Level
 ---@field auto_attack_tick number 攻击间隔
 ---@field auto_wait_tick number 攻击等待计时
 ---@field nearbyNpcs table<Npc> 附近的NPC列表
+---@field actor MiniPlayer
 ---@field New fun( info_:table ):   Player
 local _M = ClassMgr.Class('Player', Entity)
 
@@ -53,6 +53,17 @@ function _M:OnInit(info_)
     self.skills = {} ---@type table<string, Skill>
     self.equippedSkills = {} ---@type table<number, string>
     self.skillCastabilityTask = nil ---@type number 技能可释放状态检查任务ID
+    self._moveMethod = nil
+
+    self:SubscribeEvent("ClickQuest", function (evt)
+        local quest = self.quests[evt.name]
+        gg.log("ClickQuest", evt, quest)
+        if not quest then
+            self:SendHoverText("不存在的任务 %s", evt.name)
+            return
+        end
+        quest.quest:OnClick(self)
+    end)
 
     self:SubscribeEvent("CastSpell", function (evt)
         if evt.player == self then
@@ -96,7 +107,7 @@ end
 
 ---标记红点
 function _M:MarkNew(path)
-    
+
 end
 
 function _M:RefreshQuest(key)
@@ -104,19 +115,19 @@ function _M:RefreshQuest(key)
     --否则: 重置任务名中包含key的
     local questsToRemove = {}
     local refreshedQuestNames = {}
-    
+
     -- 遍历所有已接受的任务
     for questId, quest in pairs(self.quests) do
         local shouldRefresh = false
-        
+
         -- 检查刷新类型
         if key == "每日" or key == "每周" or key == "每月" then
             shouldRefresh = quest.quest.refreshType == key
         else
-            -- 检查任务名是否包含key
+            print("questName", quest.quest.name, key)
             shouldRefresh = string.find(quest.quest.name, key) ~= nil
         end
-        
+
         if shouldRefresh then
             table.insert(questsToRemove, questId)
             table.insert(refreshedQuestNames, quest.quest.name)
@@ -124,15 +135,15 @@ function _M:RefreshQuest(key)
             self.acceptedQuestIds[questId] = nil
         end
     end
-    
+
     -- 移除需要刷新的任务
     for _, questId in ipairs(questsToRemove) do
         self.quests[questId] = nil
     end
-    
+
     -- 同步到客户端
     self:UpdateQuestsData()
-    
+
     -- 发送刷新消息
     if #refreshedQuestNames > 0 then
         local message = string.format("已刷新以下任务：\n%s", table.concat(refreshedQuestNames, "\n"))
@@ -152,6 +163,23 @@ function _M:ExecuteCommands(commands, castParam)
     for _, command in ipairs(commands) do
         self:ExecuteCommand(command, castParam)
     end
+end
+
+function _M:EnterBattle()
+    self:showReviveEffect(self:GetPosition())
+    for _, skill in pairs(self.skills) do
+        if skill.skillType.battleModel then
+            self:SetModel(skill.skillType.battleModel, skill.skillType.battleAnimator, skill.skillType.battleStateMachine)
+            break
+        end
+    end
+end
+
+function _M:ExitBattle()
+    self:showReviveEffect(self:GetPosition())
+    self:SetModel("sandboxSysId://ministudio/entity/player/defaultplayer/body.prefab",
+    "sandboxSysId&restype=12://ministudio/entity/player/player12/Animation/OfficialController.controller",
+    nil)
 end
 
 ---@override
@@ -202,12 +230,12 @@ function _M:RefreshStats()
     self:ResetStats("EQUIP")
     self:RemoveTagHandler("EQUIP-")
     self:RemoveTagHandler("SKILL-")
-    
+
     -- 遍历所有技能
     for skillId, skill in pairs(self.skills) do
         -- 检查技能是否应该生效
         local shouldBeEffective = skill.equipSlot > 0 or skill.skillType.effectiveWithoutEquip
-        
+
         if shouldBeEffective then
             -- 添加被动词条
             for _, tagType in ipairs(skill.skillType.passiveTags) do
@@ -221,7 +249,7 @@ function _M:RefreshStats()
     -- 添加所有属性的基础值
     local StatTypeConfig = require(MainStorage.code.common.config.StatTypeConfig) ---@type StatTypeConfig
     for statName, statType in pairs(StatTypeConfig.GetAll()) do
-        self:AddStat(statName, statType.baseValue, {source = "EQUIP", refresh = false})
+        self:AddStat(statName, statType.baseValue,"EQUIP", false)
     end
 
     -- 直接遍历bag_items，跳过c =0
@@ -231,7 +259,7 @@ function _M:RefreshStats()
                 if item and item.itemType then
                     -- 遍历装备的所有属性
                     for statName, amount in pairs(item:GetStat()) do
-                        self:AddStat(statName, amount, {source = "EQUIP", refresh = false})
+                        self:AddStat(statName, amount, "EQUIP", false)
                     end
                     for _, tag in ipairs(item.itemType.boundTags) do
                         self:AddTagHandler(TagTypeConfig.Get(tag):FactoryEquipingTag("EQUIP-", 1.0))
@@ -248,6 +276,12 @@ function _M:RefreshStats()
 end
 
 function _M:SendEvent(eventName, data)
+    if not data then
+        data = {}
+    end
+    if not eventName then
+        print("发送事件时未传入事件: ".. debug.traceback())
+    end
     data.cmd = eventName
     gg.network_channel:fireClient(self.uin, data)
 end
@@ -259,19 +293,18 @@ end
 function _M:initSkillData()
     -- 从云数据读取
     local ret1_, cloud_data_ = cloudDataMgr.ReadSkillData(self.uin)
+    gg.log("initSkillData", ret1_, cloud_data_)
     if ret1_ == 0 and cloud_data_ and cloud_data_.skills then
         -- 加载已保存的技能
         for skillId, skillData in pairs(cloud_data_.skills) do
             local skill = Skill.New(self, skillData)
             if not skill.skillType then
-                print(self.name .. "的技能不存在： " .. skillData["skill"])
+                gg.log(self.name .. "的技能不存在： " .. skillData["skill"])
             else
                 self.skills[skillId] = skill
             end
         end
     end
-    -- 同步到客户端
-    self:syncSkillData()
 end
 
 -- 保存技能配置
@@ -284,7 +317,7 @@ function _M:syncSkillData()
     local skillData = {
         skills = {}
     }
-    
+
     -- 收集技能数据
     for skillId, skill in pairs(self.skills) do
         skillData.skills[skillId] = {
@@ -292,13 +325,13 @@ function _M:syncSkillData()
             level = skill.level,
             slot = skill.equipSlot
         }
-        
+
         -- 记录已装备的技能
         if skill.equipSlot > 0 then
             self.equippedSkills[skill.equipSlot] = skillId
         end
     end
-    
+
     -- 发送到客户端
     gg.network_channel:fireClient(self.uin, {
         cmd = 'SyncPlayerSkills',
@@ -311,7 +344,7 @@ end
 function _M:EquipSkill(skillId, slot)
     local skill = self.skills[skillId]
     if not skill then return false end
-    
+
     -- 如果目标槽位已有技能，先卸下
     local existingSkillId = self.equippedSkills[slot]
     if existingSkillId then
@@ -320,14 +353,14 @@ function _M:EquipSkill(skillId, slot)
             existingSkill.equipSlot = 0
         end
     end
-    
+
     -- 装备新技能
     skill.equipSlot = slot
     self.equippedSkills[slot] = skillId
-    
+
     -- 刷新属性
     self:RefreshStats()
-    
+
     -- 保存配置
     self:saveSkillConfig()
     return true
@@ -337,15 +370,15 @@ end
 function _M:UnequipSkill(slot)
     local skillId = self.equippedSkills[slot]
     if not skillId then return false end
-    
+
     local skill = self.skills[skillId]
     if skill then
         skill.equipSlot = 0
         self.equippedSkills[slot] = nil
-        
+
         -- 刷新属性
         self:RefreshStats()
-        
+
         -- 保存配置
         self:saveSkillConfig()
         return true
@@ -369,16 +402,16 @@ function _M:UpgradeSkill(skillType)
         self:saveSkillConfig()
         return true
     end
-    
+
     -- 如果技能已存在，检查是否可以升级
     if foundSkill.level >= skillType.maxLevel then
         return false
     end
-    
+
     -- 升级技能
     foundSkill.level = foundSkill.level + 1
     self:RefreshStats()
-    
+
     -- 保存配置
     self:saveSkillConfig()
     return true
@@ -474,7 +507,6 @@ function _M:SendChatText( text, ... )
 end
 
 function _M:SetHealth(health)
-    print("SetHealth", self.name, health)
     Entity.SetHealth(self, health)
     self:SendEvent("UpdateHealth", {
         h = self.health,
@@ -492,11 +524,30 @@ end
 -- 添加附近的NPC
 ---@param npc Npc
 function _M:AddNearbyNpc(npc)
-    gg.log("AddNearbyNpc", npc, npc.uuid)
     if not self.nearbyNpcs[npc.uuid] then
         self.nearbyNpcs[npc.uuid] = npc
         self:UpdateNearbyNpcsToClient()
     end
+end
+
+function _M:SetMoveable(moveable)
+    if moveable then
+        self:RefreshStats()
+    else
+        self.actor.Movespeed = 0
+    end
+    -- if not self._moveMethod then
+    --     self._moveMethod = {
+    --         self.actor.TouchMovementMode, self.actor.PCMovementMode
+    --     }
+    -- end
+    -- if moveable then
+    --     self.actor.TouchMovementMode = self._moveMethod[1]
+    --     self.actor.PCMovementMode = self._moveMethod[2]
+    -- else
+    --     self.actor.TouchMovementMode = Enum.DevTouchMovementMode.Scriptable
+    --     self.actor.PCMovementMode = Enum.DevPCMovementMode.Scriptable
+    -- end
 end
 
 -- 移除附近的NPC
@@ -542,16 +593,29 @@ function _M:UpdateNearbyNpcsToClient()
     })
 end
 
+function _M:ProcessQuestEvent(event, amount)
+    for _, quest in pairs(self.quests) do
+        if quest.quest.questType == "事件" and string.find(quest.quest.eventName, event) then
+            quest:AddProgress(amount)
+        end
+    end
+end
+
+function _M:UpdateHud()
+    self:UpdateQuestsData()
+    self:syncSkillData()
+end
+
 -- 同步任务数据到客户端
 function _M:UpdateQuestsData()
     -- 构建任务数据
     local quests = {}
-    
+
     -- 添加进行中的任务
     for questId, quest in pairs(self.quests) do
         table.insert(quests, quest:GetQuestDesc())
     end
-    
+
     -- 发送到客户端
     gg.network_channel:fireClient(self.uin, {
         cmd = 'UpdateQuestsData',
@@ -562,7 +626,7 @@ end
 ---@private
 function _M:_updateCastability()
     local castabilityData = {}
-        
+
     -- 遍历所有装备的技能
     for skillId, skill in pairs(self.skills) do
         if skill.equipSlot > 0 and skill.skillType.activeSpell then
@@ -600,66 +664,6 @@ function _M:StopSkillCastabilityCheck()
     end
 end
 
--- 静态匹配队列
-_M.matchQueue = {} ---@type table<string, Player>
-_M.currentLevel = nil ---@type Level
-
----加入匹配队列
----@param levelType LevelType
-function _M:Queue(levelType)
-    -- 如果已经在队列中，直接返回
-    if _M.matchQueue[self.uin] then
-        self:SendChatText("你已经在匹配队列中")
-        return
-    end
-
-    -- 检查是否满足进入条件
-    if not levelType.entryConditions:Check(self) then
-        self:SendChatText("不满足进入条件")
-        return
-    end
-
-    -- 加入队列
-    _M.matchQueue[self.uin] = self
-    self:SendChatText("已加入匹配队列")
-
-    -- 检查是否可以开始游戏
-    if #_M.matchQueue >= levelType.maxPlayers then
-        _M:StartLevel(levelType)
-    end
-end
-
----从匹配队列中移除
-function _M:LeaveQueue()
-    if _M.matchQueue[self.uin] then
-        _M.matchQueue[self.uin] = nil
-        self:SendChatText("已离开匹配队列")
-    end
-end
-
----开始关卡
----@param levelType LevelType
-function _M.StartLevel(levelType)
-    -- 创建新的关卡实例
-    local level = Level.New(levelType)
-    _M.currentLevel = level
-
-    -- 将队列中的玩家添加到关卡
-    for _, player in pairs(_M.matchQueue) do
-        level:AddPlayer(player)
-    end
-
-    -- 清空匹配队列
-    _M.matchQueue = {}
-
-    -- 开始关卡
-    level:Start()
-
-    -- 通知所有玩家
-    for _, player in pairs(level.players) do
-        player:SendChatText("匹配成功，关卡开始！")
-    end
-end
 
 ---设置玩家视角
 ---@param euler Vector3 旋转角度

@@ -2,8 +2,10 @@ local MainStorage = game:GetService('MainStorage')
 local gg                = require(MainStorage.code.common.MGlobal)    ---@type gg
 local MobTypeConfig = require(MainStorage.code.common.config.MobTypeConfig)  ---@type MobTypeConfig
 local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
+local ServerScheduler = require(MainStorage.code.server.ServerScheduler) ---@type ServerScheduler
 local Modifiers = require(MainStorage.code.common.config_type.modifier.Modifiers) ---@type Modifiers
 local WeightedRandomSelector = require(MainStorage.code.common.WeightedRandomSelector) ---@type WeightedRandomSelector
+local LevelConfig = require(MainStorage.code.common.config.LevelConfig)  ---@type LevelConfig
 
 ---@class SpawningMob:Class
 ---@field mobType MobType
@@ -169,9 +171,6 @@ end
 ---@field New fun( data:table ):LevelType
 local LevelType = ClassMgr.Class("LevelType")
 
--- 静态匹配队列，按关卡类型分类
-LevelType.matchQueues = {} ---@type table<string, table<string, Player>>
-
 function LevelType:OnInit(data)
     self.levelId = data["关卡ID"] ---@type string
     self.category = data["分类"] or "" ---@type string
@@ -181,6 +180,8 @@ function LevelType:OnInit(data)
     self.entryPoints = data["进入位置"] or {} ---@type string[]
     self.spawnPoints = data["刷怪点"] or {} ---@type string[]
     self.maxPlayers = data["最大玩家数"] or 1 ---@type number
+    self.startPlayers = data["开始玩家"] or self.maxPlayers ---@type number
+    self.extraPlayerTime = data["增加额外玩家时间"] or 10 ---@type number
     self.entryConditions = data["进入条件"] or Modifiers.New({}) ---@type Modifiers
     self.twoStarDescription = data["描述_2星"] or "" ---@type string
     self.threeStarDescription = data["描述_3星"] or "" ---@type string
@@ -191,6 +192,12 @@ function LevelType:OnInit(data)
     self.level = data["等级"] or 1 ---@type number
     self.initialBagWidth = data["初始背包宽"] or 0 ---@type number
     self.initialBagHeight = data["初始背包高"] or 0 ---@type number
+
+    -- 初始化匹配相关属性
+    self.matchQueue = {} ---@type table<string, Player>
+    self.playerCount = 0 ---@type number
+    self.virtualPlayerCount = 0 ---@type number
+    self.virtualPlayerTimer = 0 ---@type number
 
     -- 加载波次数据
     self.waves = {} ---@type Wave[]
@@ -213,7 +220,7 @@ function LevelType:OnInit(data)
         local path = sceneData["路径"]
         if scene and path then
             local node = scene:Get(path)
-            if node then
+        if node then
                 table.insert(self.levels, Level.New(self, node, #self.levels + 1, scene))
             else
                 print(string.format("Warning: Failed to find scene node at %s/%s", scene, path))
@@ -226,56 +233,106 @@ end
 -- 匹配系统相关方法
 --------------------------------------------------
 
----获取匹配队列
----@return table<string, Player>
-function LevelType:GetMatchQueue()
-    if not LevelType.matchQueues[self.levelId] then
-        LevelType.matchQueues[self.levelId] = {}
+---检查是否可以开始游戏
+---@return boolean
+function LevelType:CanStartGame()
+    return self.playerCount + self.virtualPlayerCount >= self.maxPlayers
+end
+
+---更新假人计数
+function LevelType:UpdateVirtualPlayerCount()
+    local currentTime = os.time()
+    
+    -- 如果真实玩家数达到开始玩家数，且距离上次更新超过额外玩家时间
+    if self.playerCount >= self.startPlayers and currentTime - self.virtualPlayerTimer >= self.extraPlayerTime then
+        -- 如果真实玩家数+假人数未达到最大玩家数，增加一个假人
+        if self.playerCount + self.virtualPlayerCount < self.maxPlayers then
+            self.virtualPlayerCount = self.virtualPlayerCount + 1
+            self.virtualPlayerTimer = currentTime
+            
+            -- 通知队列中的玩家
+            for _, player in pairs(self.matchQueue) do
+                player:SendEvent("MatchProgressUpdate", {
+                    currentCount = self.playerCount + self.virtualPlayerCount,
+                    totalCount = self.maxPlayers
+                })
+            end
+            
+            -- 检查是否可以开始游戏
+            if self:CanStartGame() then
+                self:StartLevel()
+            end
+        end
     end
-    return LevelType.matchQueues[self.levelId]
 end
 
 ---加入匹配队列
 ---@param player Player
+---@return boolean 成功进入
 function LevelType:Queue(player)
-    local queue = self:GetMatchQueue()
-    
     -- 如果已经在队列中，直接返回
-    if queue[player.uin] then
+    if self.matchQueue[player.uin] then
         player:SendChatText("你已经在匹配队列中")
-        return
+        return false
     end
 
     local enterParam = self.entryConditions:Check(player, player)
     if enterParam.cancelled then
         player:SendChatText("不满足进入条件")
-        return
+        return false
+    end
+
+    if self.prerequisiteLevel then
+        -- TODO: 检查前置关卡是否完成
+        -- 这里需要实现前置关卡的检查逻辑
+    end
+
+    -- 检查前置变量
+    for varName, requiredValue in pairs(self.prerequisiteVars) do
+        local currentValue = player:GetVariable(varName) or 0
+        if currentValue < requiredValue then
+            player:SendChatText(string.format("不满足前置条件: %s 需要 %d", varName, requiredValue))
+            return false
+        end
+    end
+
+    -- 扣除变量
+    for varName, deductValue in pairs(self.deductVars) do
+        local currentValue = player:GetVariable(varName) or 0
+        if currentValue < deductValue then
+            player:SendChatText(string.format("资源不足: %s 需要 %d", varName, deductValue))
+            return false
+        end
+        player:AddVariable(varName, -deductValue)
     end
 
     -- 加入队列
-    queue[player.uin] = player
+    self.matchQueue[player.uin] = player
+    self.playerCount = self.playerCount + 1
     player:SendChatText("已加入匹配队列")
+    
+    -- 重置假人计数和计时器
+    self.virtualPlayerCount = 0
+    self.virtualPlayerTimer = os.time()
+
+    -- 通知所有玩家当前匹配进度
+    for _, p in pairs(self.matchQueue) do
+        p:SendEvent("MatchProgressUpdate", {
+            currentCount = self.playerCount,
+            totalCount = self.maxPlayers
+        })
+    end
 
     -- 检查是否可以开始游戏
-    if #queue >= self.maxPlayers then
+    if self:CanStartGame() then
         self:StartLevel()
+        return true
     end
-end
-
----从匹配队列中移除
----@param player Player
-function LevelType:LeaveQueue(player)
-    local queue = self:GetMatchQueue()
-    if queue[player.uin] then
-        queue[player.uin] = nil
-        player:SendChatText("已离开匹配队列")
-    end
+    return false
 end
 
 ---开始关卡
 function LevelType:StartLevel()
-    local queue = self:GetMatchQueue()
-    
     -- 找到一个可用的关卡实例
     local availableLevel = nil
     for _, level in ipairs(self.levels) do
@@ -287,19 +344,23 @@ function LevelType:StartLevel()
 
     if not availableLevel then
         -- 如果没有可用的关卡实例，通知所有玩家
-        for _, player in pairs(queue) do
+        for _, player in pairs(self.matchQueue) do
             player:SendChatText("当前没有可用的关卡实例，请稍后再试")
+            player:SendEvent("MatchCancel")
         end
         return
     end
 
     -- 将队列中的玩家添加到关卡
-    for _, player in pairs(queue) do
+    for _, player in pairs(self.matchQueue) do
         availableLevel:AddPlayer(player)
     end
 
-    -- 清空匹配队列
-    LevelType.matchQueues[self.levelId] = {}
+    -- 清空匹配队列和假人计数
+    self.matchQueue = {}
+    self.playerCount = 0
+    self.virtualPlayerCount = 0
+    self.virtualPlayerTimer = 0
 
     -- 开始关卡
     availableLevel:Start()
@@ -307,7 +368,40 @@ function LevelType:StartLevel()
     -- 通知所有玩家
     for _, player in pairs(availableLevel.players) do
         player:SendChatText("匹配成功，关卡开始！")
+        player:SendEvent("MatchStart")
     end
 end
+
+---从匹配队列中移除
+---@param player Player
+function LevelType:LeaveQueue(player)
+    if self.matchQueue[player.uin] then
+        self.matchQueue[player.uin] = nil
+        self.playerCount = self.playerCount - 1
+        player:SendChatText("已离开匹配队列")
+        player:SendEvent("MatchCancel")
+        
+        -- 如果真实玩家数低于开始玩家数，重置假人计数
+        if self.playerCount < self.startPlayers then
+            self.virtualPlayerCount = 0
+            self.virtualPlayerTimer = os.time()
+        end
+
+        -- 通知剩余玩家当前匹配进度
+        for _, p in pairs(self.matchQueue) do
+            p:SendEvent("MatchProgressUpdate", {
+                currentCount = self.playerCount,
+                totalCount = self.maxPlayers
+            })
+        end
+    end
+end
+
+-- 创建定时器更新所有关卡类型的假人计数
+ServerScheduler.add(function()
+    for _, levelType in pairs(LevelConfig.GetAll()) do
+        levelType:UpdateVirtualPlayerCount()
+    end
+end, 1, 1)
 
 return LevelType 

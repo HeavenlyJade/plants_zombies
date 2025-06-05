@@ -97,8 +97,8 @@ local _InputChangedEvent = nil
 
 ClientEventManager.Subscribe("UpdateCameraView", function(data)
     if data.x then
-        _mouseX = data.x
-        _mouseY = data.y + 180
+        _rawMouseX = data.x
+        _rawMouseY = data.y + 180
     end
 end)
 -- 在 CameraController.lua 中，替换 SetActive 函数中的鼠标处理部分：
@@ -350,14 +350,14 @@ function CameraController.CalcPivotPosition(axisDegrees)
     local orient = Quat.new()
     orient:FromEuler(Vec3.new(0, axisDegrees, 0))
     local characterPosition = _owner.Position
-    local positionVector3 = Vec3.new(characterPosition.X, characterPosition.Y, characterPosition.Z)
+    local positionVector3 = Vec3.new(characterPosition)
     local pivotPosition = positionVector3 + orient * _offset
     return pivotPosition
 end
 
 function CameraController.CalcCameraPosition(pivotPosition, xAxisDegrees, yAxisDegrees, distance, dt)
     local shakePosDelta = ShakeController.GetPosDelta()
-    if shakePosDelta.x ~= 0 then
+    if shakePosDelta.z ~= 0 then
         gg.log("shakePosDelta", shakePosDelta)
     end
     local orient = CameraController.CalcCameraRotation(xAxisDegrees, yAxisDegrees)
@@ -553,10 +553,10 @@ function CameraController.InputMove(deltaX, deltaY)
         mouseYinput = 0
     end
 
-    _mouseX = _mouseX + mouseXinput * _mouseXSensitivity
-    _mouseY = _mouseY + mouseYinput * _mouseYSensitivity
+    _rawMouseX = _rawMouseX + mouseXinput * _mouseXSensitivity
+    _rawMouseY = _rawMouseY + mouseYinput * _mouseYSensitivity
     --限制角度
-    _mouseX = math.clamp(_mouseX, _mouseXMin, _mouseXMax)
+    _rawMouseX = math.clamp(_rawMouseX, _mouseXMin, _mouseXMax)
 end
 
 --鼠标滚轮
@@ -622,18 +622,8 @@ end
 --震动更新
 function CameraController.ShakeUpdate(dt)
     local shakeRotData = ShakeController.GetRotDelta()
-    _mouseX = _mouseX - shakeRotData.x
-    _mouseY = _mouseY - shakeRotData.y
-
-    _rawMouseX = _mouseX
-    _rawMouseY = _mouseY
-    ShakeController.Update(dt)
-
-    if ShakeController.IsShaking() then
-        shakeRotData = ShakeController.GetRotDelta()
-        _mouseX = _mouseX + shakeRotData.x
-        _mouseY = _mouseY + shakeRotData.y
-    end
+    _mouseX = _rawMouseX + shakeRotData.x
+    _mouseY = _rawMouseY + shakeRotData.y
 end
 
 --是否在震动

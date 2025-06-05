@@ -110,10 +110,7 @@ function _M:CreateModel(scene)
 
     -- 创建Actor
     local container = game.WorkSpace["Ground"][scene.name]["怪物"]
-    local actor_monster = MainStorage["怪物模型"][self.mobType.data["模型"]] ---@type Actor
-    if not actor_monster then
-        actor_monster = game.WorkSpace["怪物模型"][self.mobType.data["模型"]] ---@type Actor
-    end
+    local actor_monster = gg.GetChild(MainStorage["怪物模型"], self.mobType.data["模型"]) ---@type Actor
     actor_monster = actor_monster:Clone()
     actor_monster:SetParent(container)
     actor_monster.Enabled = true
@@ -279,9 +276,6 @@ function _M:update_monster()
 
     -- 每帧更新当前行为
     self:UpdateCurrentBehavior()
-    
-    -- 处理待释放的技能
-    self:ProcessPendingSkills()
 end
 
 -- 关闭AI
@@ -326,26 +320,32 @@ function _M:UpdateBehavior()
     if self.isDead or self:IsFrozen() then
         return
     end
+
     -- 如果当前行为可以退出
     local currentBehaviorType = self.currentBehavior and self.currentBehavior["类型"]
-    if currentBehaviorType and BehaviorTree[currentBehaviorType] then
-        if BehaviorTree[currentBehaviorType]:CanExit(self) then
-            BehaviorTree[currentBehaviorType]:OnExit(self)
-            self.currentBehavior = nil
-        end
-    end
+    local newBehavior = nil
 
-    -- 如果当前没有行为，尝试进入新行为
-    if not self.currentBehavior and self.mobType.data["行为"] then
+    -- 如果当前没有行为或当前行为可以退出，尝试进入新行为
+    if (not self.currentBehavior or (currentBehaviorType and BehaviorTree[currentBehaviorType] and BehaviorTree[currentBehaviorType]:CanExit(self))) and self.mobType.data["行为"] then
         -- 遍历行为列表
         for _, behavior in ipairs(self.mobType.data["行为"]) do
             local behaviorType = behavior["类型"]
             if BehaviorTree[behaviorType] and BehaviorTree[behaviorType]:CanEnter(self, behavior) then
-                self.currentBehavior = behavior
-                BehaviorTree[behaviorType]:OnEnter(self)
-                gg.log("EnterBehavior", self, behaviorType)
+                newBehavior = behavior
                 break
             end
+        end
+
+        -- 只有当新行为与当前行为不同时才执行切换
+        if newBehavior and (not currentBehaviorType or newBehavior["类型"] ~= currentBehaviorType) then
+            -- 退出当前行为
+            if currentBehaviorType and BehaviorTree[currentBehaviorType] then
+                BehaviorTree[currentBehaviorType]:OnExit(self)
+            end
+            -- 进入新行为
+            self.currentBehavior = newBehavior
+            BehaviorTree[newBehavior["类型"]]:OnEnter(self)
+            gg.log("EnterBehavior", self, newBehavior["类型"])
         end
     end
 end
@@ -362,18 +362,18 @@ function _M:UpdateCurrentBehavior()
     end
 end
 
---- 处理待释放的技能
-function _M:ProcessPendingSkills()
-    if #self.pendingSkills == 0 then return end
+-- --- 处理待释放的技能
+-- function _M:ProcessPendingSkills()
+--     if #self.pendingSkills == 0 then return end
     
-    -- 复制待释放技能列表
-    local skillsToCast = self.pendingSkills
-    self.pendingSkills = {}
+--     -- 复制待释放技能列表
+--     local skillsToCast = self.pendingSkills
+--     self.pendingSkills = {}
     
-    -- 释放所有待释放的技能
-    for _, skill in ipairs(skillsToCast) do
-        skill:CastSkill(self, self.target)
-    end
-end
+--     -- 释放所有待释放的技能
+--     for _, skill in ipairs(skillsToCast) do
+--         skill:CastSkill(self, self.target)
+--     end
+-- end
 
 return _M

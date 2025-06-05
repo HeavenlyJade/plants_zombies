@@ -77,28 +77,12 @@ end
 function CastParam:GetParamByName(name, v, def)
     -- gg.log("GetParamByName", name, v, def)
     local value = self.extraParams[name .. "." .. v] or self.extraParams[v]
+    -- gg.log("GetParamByName", name, value, self.extraParams, self.extraParams[name .. "." .. v], self.extraParams[v])
     if value == nil then
         return def
     end
     
-    -- 处理数值类型转换
-    if type(def) == "number" then
-        if math.type(value) == "integer" and math.type(def) == "float" then
-            return value + 0.0 -- 将整数转为浮点数
-        elseif math.type(value) == "float" and math.type(def) == "integer" then
-            return math.floor(value) -- 将浮点数转为整数
-        end
-    end
-    
-    -- 尝试直接返回相同类型
-    if type(value) == type(def) then
-        return value
-    end
-    
-    -- 类型不匹配时返回默认值
-    gg.log(string.format("参数类型转换失败: %s.%s, 值类型: %s, 目标类型: %s", 
-        name, v, type(value), type(def)))
-    return def
+    return value
 end
 
 return CastParam

@@ -6,8 +6,6 @@ local require = require
 
 local MainStorage = game:GetService("MainStorage")
 local gg              = require(MainStorage.code.common.MGlobal)   ---@type gg
-local common_const    = require(MainStorage.code.common.MConst)    ---@type common_const
-local cloudDataMgr    = require(MainStorage.code.server.MCloudDataMgr)    ---@type MCloudDataMgr
 local ItemRankConfig = require(MainStorage.code.common.config.ItemRankConfig) ---@type ItemRankConfig
 local ServerScheduler = require(MainStorage.code.server.ServerScheduler) ---@type ServerScheduler
 
@@ -20,7 +18,6 @@ local BagMgr = {
 
 function SyncAll()
     for bag, _ in pairs(BagMgr.need_sync_bag) do
-        print('SyncAll', bag)
         bag:SyncToClient()
     end
     BagMgr.need_sync_bag = {}

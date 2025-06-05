@@ -16,7 +16,6 @@ local os   = os
 
 local MainStorage = game:GetService("MainStorage")
 local gg                = require(MainStorage.code.common.MGlobal)    ---@type gg
-local common_config     = require(MainStorage.code.common.MConfig)    ---@type common_config
 local common_const      = require(MainStorage.code.common.MConst)     ---@type common_const
 local Player       = require(MainStorage.code.server.entity_types.Player)          ---@type Player
 local MTerrain      = require(MainStorage.code.server.MTerrain)         ---@type MTerrain
@@ -43,7 +42,7 @@ function MainServer.start_server()
     wait(1)                               --云服务器启动配置文件下载和解析繁忙，稍微等待
     MainServer.bind_update_tick()         --开始tick
     initFinished = true
-    
+
     -- 处理等待中的玩家
     for _, player in ipairs(waitingPlayers) do
         MainServer.player_enter_game(player)
@@ -101,7 +100,6 @@ end
 
 --玩家进入游戏，数据加载
 function MainServer.player_enter_game(player)
-    gg.log("player enter====", player.UserId, player.Name, player.Nickname)
     gg.network_channel:fireClient(player.UserId, {cmd = "cmd_update_player_ui",{}})
     player.DefaultDie = false   --取消默认死亡
 
@@ -141,8 +139,9 @@ function MainServer.player_enter_game(player)
         nickname=player.Nickname,
         npc_type=common_const.NPC_TYPE.PLAYER,
         level = cloud_player_data_.level,
-        exp = cloud_player_data_.exp
+        exp = cloud_player_data_.exp,
     })
+    player_.variables = cloud_player_data_.vars or {}
 
     --加载数据 2 玩家历史装备数据
     local ret2_, cloud_player_bag_ = cloudDataMgr.ReadPlayerBag(player_)
@@ -170,12 +169,12 @@ function MainServer.player_enter_game(player)
     actor_.CollideGroupID = 4
     player_:ChangeScene('g0')       --默认g0大厅
 
-    player_:equipWeapon(common_config.assets_dict.model.model_sword)
     player_:setPlayerNetStat(common_const.PLAYER_NET_STAT.LOGIN_IN)    --player_net_stat login ok
 
     player_:initSkillData()                 --- 加载玩家技能
     player_:RefreshStats()               --重生 --刷新战斗属性
     player_:SetHealth(player_.maxHealth)
+    player_:UpdateHud()
 end
 
 --玩家离开游戏
@@ -202,11 +201,9 @@ end
 --消息回调 (优化版本，使用命令表和错误处理)
 function MainServer.OnServerNotify(uin_, args)
     -- 参数校验
-    gg.log("uin_, args",uin_, args)
     if type(args) ~= 'table' then return end
     if not args.cmd then return end
 
-    gg.log("OnServerNotify",args.cmd, uin_)
     local player_ = gg.getPlayerByUin(uin_)
     args.player = player_
     ServerEventManager.Publish(args.cmd, args)

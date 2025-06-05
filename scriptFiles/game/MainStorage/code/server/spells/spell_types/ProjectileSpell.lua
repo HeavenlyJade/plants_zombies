@@ -241,6 +241,7 @@ function ProjectileSpell:UpdateProjectile(id)
         item.destroyCount = item.destroyCount - 1
         if item.destroyCount <= 0 then
             self:DestroyProjectile(id)
+            self:PlayEffect(self.castEffects, item.caster, newPosition, item.param, "触发点")
         end
         return
     end
@@ -292,14 +293,14 @@ function ProjectileSpell:UpdateProjectile(id)
             {1}
         )
         if hitGround and #hitGround > 0 then
-            item.destroyCount = 5  -- 地形碰撞也延迟三次更新后销毁
+            item.destroyCount = 3  -- 地形碰撞也延迟三次更新后销毁
         end
     end
     
     -- 检查持续时间
     if self.duration > 0 then
         if item.startTime and os.time() - item.startTime >= self.duration then
-            item.destroyCount = 5  -- 超时也延迟三次更新后销毁
+            item.destroyCount = 3  -- 超时也延迟三次更新后销毁
         end
     end
 end
@@ -436,7 +437,7 @@ function ProjectileSpell:CastReal(caster, target, param)
             baseDirection = caster:GetDirection()
         end
     else
-        baseDirection = (self:GetPosition(target) - caster:GetPosition()):Normalize()
+        baseDirection = (self:GetPosition(target) - self:GetPosition(caster)):Normalize()
     end
     param.realTarget = target
     
@@ -478,9 +479,6 @@ function ProjectileSpell:CastReal(caster, target, param)
         local delay = shootDelay * (i - 1)
         self:SpawnProjectile(Vec3.new(position), currentDirection, Vec3.new(baseDirection), caster, param, delay)
     end
-    
-    -- 播放释放特效
-    self:PlayEffect(self.projectileEffects, caster, target, param)
     
     return true
 end

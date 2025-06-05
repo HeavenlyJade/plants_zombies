@@ -79,12 +79,7 @@ function Bag:Save()
         items = itemData
     }
     local cloudService = game:GetService("CloudService") --- @type CloudService
-    cloudService:SetTableAsync('inv' .. self.player.uin, data, function(ret_)
-        if not ret_ then
-            gg.log("Save Error: key=", 'inv' .. self.player.uin)
-        else
-            gg.log("Save ok: key=", 'inv' .. self.player.uin)
-        end
+    cloudService:SetTableAsync('inv' .. self.player.uin, data, function ()
     end)
 
 end

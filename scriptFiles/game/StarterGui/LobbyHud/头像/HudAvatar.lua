@@ -23,6 +23,12 @@ function HudAvatar:OnInit(node, config)
     self:Get("名字背景/UID").node.Title = tostring(localPlayer.UserId)
     self.questList = self:Get("头像背景/任务列表", ViewList, function (node)
         local button = ViewButton.New(node, self)
+        button.clickCb = function (ui, button)
+            gg.network_channel:FireServer({
+                cmd = "ClickQuest",
+                name = button.extraParams.questId,
+            })
+        end
         return button
     end)
     self:Get("头像背景/任务按钮", ViewButton).clickCb = function (ui, viewButton)
@@ -31,10 +37,14 @@ function HudAvatar:OnInit(node, config)
     
     ClientEventManager.Subscribe("UpdateQuestsData", function(evt)
         local evt = evt ---@type QuestsUpdate
-        self.questList:SetElementSize(#evt.quests) ---设为 #evt.quests
+        self.questList:SetElementSize(#evt.quests)
         for i, child in ipairs(evt.quests) do
             local ele = self.questList:GetChild(i) ---@cast ele ViewButton
+            ele.extraParams = {
+                questId = child.name
+            }
             ele:Get("任务标题").node.Title = child.description
+            ele:Get("任务数量").node.Title = string.format("%d/%d", child.count, child.countMax)
         end
     end)
 end

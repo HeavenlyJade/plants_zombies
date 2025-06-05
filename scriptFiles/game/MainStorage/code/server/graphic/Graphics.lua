@@ -9,7 +9,7 @@ local Graphic = ClassMgr.Class("Graphic")
 -- 从模板创建新的特效对象
 local function CreateParticle(particleName)
     if particleName == "" then
-        return nil
+        return nil, nil
     end
     local node = MainStorage
     local fullPath = ""
@@ -32,10 +32,10 @@ local function CreateParticle(particleName)
     end
     
     if not node then
-        return nil
+        return nil, nil
     end
     
-    return node:Clone()
+    return node:Clone(), node
 end
 
 function Graphic:OnInit( data )
@@ -46,17 +46,32 @@ function Graphic:OnInit( data )
     self.duration = data["持续时间"] or 0
     self.repeatCount = data["重复次数"] or 1
     self.repeatDelay = data["重复延迟"] or 0
+    self.autoPlay = self.targeter == "目标" or self.targeter == "自己" or self.targeter == "场景"
+end
+
+function Graphic:IsTargeter(targeter)
+    if self.autoPlay then
+        if targeter then
+        return false
+        end
+    else
+        if targeter ~= self.targeter then
+            return false
+        end
+    end
+    return true
 end
 
 function Graphic:GetTarget(caster, target)
-    if self.targeter == "目标" or self.targeter == "击中目标" then
+    if self.targeter == "目标" then
         return target
     elseif self.targeter == "自己" then
         return caster
-    else
+    elseif self.targeter == "场景" then
         local scene = target.scene ---@type Scene
         return scene.node2Entity[scene:Get(self.targeterPath)]
     end
+    return target
 end
 
 ---@param caster Entity
@@ -64,7 +79,12 @@ end
 ---@param param CastParam
 ---@param actions table
 function Graphic:PlayAt(caster, target, param, actions)
-    local c = self:GetTarget(caster, target)
+    local c
+    if self.autoPlay then
+        c = self:GetTarget(caster, target)
+    else
+        c = target
+    end
     if self.delay > 0 then
         ServerScheduler.add(function ()
             self:PlayAtReal(caster, c, param, actions)
@@ -99,7 +119,7 @@ function Graphic:PlayAtReal(caster, target, param, actions)
         end
         
         -- 创建并设置效果对象
-        local effect = self:CreateEffect(target)
+        local effect = self:CreateEffect(target, caster.scene)
         if not effect then 
             return 
         end
@@ -137,7 +157,7 @@ function Graphic:GetName()
     return "Unknown"
 end
 
-function Graphic:CreateEffect(target)
+function Graphic:CreateEffect(target, scene)
     return nil
 end
 
@@ -159,8 +179,7 @@ function ParticleGraphic:GetName()
     return self.particleName
 end
 
-function ParticleGraphic:CreateEffect(target)
-    local scene = target.scene
+function ParticleGraphic:CreateEffect(target, scene)
     local container
     if self.boundToEntity and target.isEntity then
         container = target.actor
@@ -172,15 +191,15 @@ function ParticleGraphic:CreateEffect(target)
         return nil
     end
     
-    local fx = CreateParticle(self.particleName)
-    if not fx then return nil end
+    local fx, previous = CreateParticle(self.particleName)
+    if not fx or not previous then return nil end
     
     fx:SetParent(container)
     if not self.boundToEntity then
         fx.Position = (self.offset + target:GetCenterPosition()):ToVector3()
-        gg.log("Position", target:GetCenterPosition(), self.offset, target.actor.Position)
     else
-        fx.LocalPosition = self.offset:ToVector3()
+        fx.LocalPosition = previous.LocalPosition
+        fx.LocalEuler = previous.LocalEuler
     end
     fx.Enabled = true
     
@@ -196,6 +215,7 @@ function AnimationGraphic:OnInit( data )
 end
 
 function AnimationGraphic:PlayAtReal(caster, target, param)
+    gg.log("Play AnimationGraphic", target, self.animationName)
     if target.modelPlayer then
         target.modelPlayer:SwitchState(self.animationName, self.playbackSpeed)
     end
@@ -203,34 +223,26 @@ end
 
 ---@class CameraShakeGraphic:Graphic
 local CameraShakeGraphic = ClassMgr.Class("CameraShakeGraphic", Graphic)
+
 function CameraShakeGraphic:OnInit( data )
     Graphic.OnInit(self, data)
-    -- 震动基础参数
-    self.name = gg.create_uuid('g_SHAKE')
-    self.frequency = data["频率"] or 0.05
-    self.strength = data["强度"] or 1.0
-    self.rotation = data["旋转"] ---@type Vector3
+    self.rotation = data["旋转"] ---@type Vector2
     self.position = data["位移"] ---@type Vector3
-    
-    -- 循环参数
-    self.loop = data["循环"] or false
+    self.tweenStyle = data["动画风格"]
+    self.dropStyle = data["衰减风格"]
+    self.frequency = data["频率"]
 end
 
 function CameraShakeGraphic:PlayAtReal(caster, target, param)
     if target.isPlayer then
         gg.network_channel:fireClient(target.uin, {
             cmd = "ShakeCamera",
-            name = self.name,
-            duration = self.duration,
-            frequency = self.frequency,
-            strength = self.strength,
-            rotX = self.rotation[1],
-            rotY = self.rotation[2],
-            rotZ = self.rotation[3],
-            posX = self.position[1],
-            posY = self.position[2],
-            posZ = self.position[3],
-            loop = self.loop
+            dura = self.duration,
+            rotShake = self.rotation,
+            posShake = self.position,
+            mode = self.tweenStyle,
+            drop = self.dropStyle,
+            frequency = self.frequency
         })
     end
 end
@@ -254,8 +266,7 @@ function ModelGraphic:GetName()
     return self.modelName
 end
 
-function ModelGraphic:CreateEffect(target)
-    local scene = target.scene
+function ModelGraphic:CreateEffect(target, scene)
     local container
     if self.boundToEntity and target.isEntity then
         container = target.actor
@@ -267,12 +278,15 @@ function ModelGraphic:CreateEffect(target)
         return nil
     end
     
-    local model = CreateParticle(self.modelName)
-    if not model then return nil end
+    local model, previous = CreateParticle(self.modelName)
+    if not model or not previous then return nil end
     
     model:SetParent(container)
     if not self.boundToEntity then
         model.LocalPosition = target:GetPosition()
+    else
+        model.LocalPosition = previous.LocalPosition
+        model.LocalEuler = previous.LocalEuler
     end
     model.Enabled = true
     

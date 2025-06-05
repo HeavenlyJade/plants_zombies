@@ -31,6 +31,9 @@ function SkillType:OnInit(data)
     self.skillType = data["技能分类"]
     self.upgradeCosts = data["升级需求素材"]
     self.quality = data["技能品级"] or "R"
+    self.battleModel = data["更改模型"]
+    self.battleAnimator = data["更改动画"]
+    self.battleStateMachine = data["更改状态机"]
 
     -- 加载被动词条
     self.passiveTags = {}

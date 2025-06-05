@@ -16,38 +16,6 @@ function LevelCommand.enter(params, player)
         return false
     end
 
-    -- 检查进入条件
-    local enterParam = levelType.entryConditions:Check(player, player)
-    if enterParam.cancelled then
-        player:SendChatText("不满足进入条件")
-        return false
-    end
-
-    -- 检查前置关卡
-    if levelType.prerequisiteLevel then
-        -- TODO: 检查前置关卡是否完成
-        -- 这里需要实现前置关卡的检查逻辑
-    end
-
-    -- 检查前置变量
-    for varName, requiredValue in pairs(levelType.prerequisiteVars) do
-        local currentValue = player:GetVariable(varName) or 0
-        if currentValue < requiredValue then
-            player:SendChatText(string.format("不满足前置条件: %s 需要 %d", varName, requiredValue))
-            return false
-        end
-    end
-
-    -- 扣除变量
-    for varName, deductValue in pairs(levelType.deductVars) do
-        local currentValue = player:GetVariable(varName) or 0
-        if currentValue < deductValue then
-            player:SendChatText(string.format("资源不足: %s 需要 %d", varName, deductValue))
-            return false
-        end
-        player:AddVariable(varName, -deductValue)
-    end
-
     -- 根据是否需要匹配来决定进入方式
     if params["无需匹配直接开始"] then
         -- 直接开始关卡

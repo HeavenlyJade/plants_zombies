@@ -2,6 +2,8 @@
 local MainStorage = game:GetService('MainStorage')
 local ClassMgr      = require(MainStorage.code.common.ClassMgr)    ---@type ClassMgr
 local SubSpell = require(MainStorage.code.server.spells.SubSpell) ---@type SubSpell
+local Condition = require(MainStorage.code.common.config_type.modifier.Condition) ---@type Condition
+local gg = require(MainStorage.code.common.MGlobal)            ---@type gg
 
 ---@class Modifier
 local _M = ClassMgr.Class("Modifier")
@@ -10,7 +12,7 @@ function _M:OnInit(data)
     -- 处理条件
     if data["条件"] then
         local conditionType = data["条件类型"] or "Variable"
-        local conditionClass = ClassMgr.GetRegisterClass(conditionType)
+        local conditionClass = Condition[conditionType]
         if conditionClass then
             self.condition = conditionClass.New(data["条件"])
         end
@@ -65,10 +67,10 @@ function _M:Check(caster, target, param)
         if success then stop = true end
     elseif self.action == "继续" then
         if not success then stop = true end
-    elseif self.action == "增加威力" then
-        if success then param.power = param.power + tonumber(self.amount) end
-    elseif self.action == "乘以威力" then
-        if success then param.power = param.power * tonumber(self.amount) end
+    elseif self.action == "威力增加" then
+        if success then param.power = param.power + gg.ProcessFormula(self.amount, caster, target) end
+    elseif self.action == "威力乘以" then
+        if success then param.power = param.power * gg.ProcessFormula(self.amount, caster, target) end
     elseif self.action == "释放" then
         if success and self.subSpell then
             self.subSpell:Cast(c, t, param)

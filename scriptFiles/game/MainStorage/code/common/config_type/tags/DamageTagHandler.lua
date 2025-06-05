@@ -34,7 +34,7 @@ function DamageTag:OnInit(data)
 end
 
 function DamageTag:CanTriggerReal(caster, target, castParam, param, log)
-    local battle = param[1] ---@type Battle
+    local battle = param ---@type Battle
     
     if battle.skipTags and battle.skipTags[self.m_tagType.id] then
         return false
@@ -85,7 +85,7 @@ function DamageTag:CanTriggerReal(caster, target, castParam, param, log)
 end
 
 function DamageTag:TriggerReal(caster, target, castParam, param, log)
-    local battle = param[1] ---@type Battle
+    local battle = param ---@type Battle
     
     -- 处理被攻击时的情况，交换施法者和目标
     if string.find(self.m_trigger, "Attacked") then

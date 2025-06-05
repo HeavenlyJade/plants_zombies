@@ -1,23 +1,24 @@
 local MainStorage = game:GetService('MainStorage')
 local gg                = require(MainStorage.code.common.MGlobal)    ---@type gg
 local Modifiers = require(MainStorage.code.common.config_type.modifier.Modifiers) ---@type Modifiers
-local LevelType = require(MainStorage.code.common.config_type.LevelType) ---@type LevelType
     
 ---@class LevelConfig
 local LevelConfig = {}
 local loaded = false
 
 local function LoadConfig()
+    local LevelType = require(MainStorage.code.common.config_type.LevelType) ---@type LevelType
     LevelConfig.config ={
     ["测试关卡"] = LevelType.New({
         ["关卡ID"] = "测试关卡",
+        ["前置关卡"] = nil,
         ["关卡波次"] = {
             {
                 ["刷新波次"] = {
                     {
                         ["刷新怪物"] = {
                             {
-                                ["怪物类型"] = "test",
+                                ["怪物类型"] = "野人",
                                 ["比重"] = 50
                             }
                         },
@@ -36,31 +37,12 @@ local function LoadConfig()
                     {
                         ["刷新怪物"] = {
                             {
-                                ["怪物类型"] = "test",
+                                ["怪物类型"] = "野人",
                                 ["比重"] = 50
                             }
                         },
                         ["持续时间"] = 20,
-                        ["数量"] = 20,
-                        ["最大数量"] = 20,
-                        ["开始时间"] = 10
-                    }
-                },
-                ["属性倍率"] = 1,
-                ["给予灵蕴"] = 50,
-                ["总计经验"] = 100
-            },
-            {
-                ["刷新波次"] = {
-                    {
-                        ["刷新怪物"] = {
-                            {
-                                ["怪物类型"] = "test",
-                                ["比重"] = 50
-                            }
-                        },
-                        ["持续时间"] = 20,
-                        ["数量"] = 50,
+                        ["数量"] = 10,
                         ["最大数量"] = 20,
                         ["开始时间"] = 10
                     }
@@ -85,7 +67,14 @@ local function LoadConfig()
             "出生点/SpawnPos6"
         },
         ["刷怪点"] = {
-            "刷怪点/Cube"
+            "刷怪点/Cube",
+            "刷怪点/Cube_copy",
+            "刷怪点/Cube_copy_2",
+            "刷怪点/Cube_copy_3",
+            "刷怪点/Cube_copy_4",
+            "刷怪点/Cube_copy_5",
+            "刷怪点/Cube_copy_6",
+            "刷怪点/Cube_copy_7"
         },
         ["最大玩家数"] = 6,
         ["进入条件"] = Modifiers.New({

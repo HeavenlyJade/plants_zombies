@@ -176,8 +176,13 @@ function MeleeBehavior:OnInit()
     ---@param self MeleeBehavior
     ---@param entity Monster
     self.Update = function(self, entity)
+        if not entity.target or not entity.target:CanBeTargeted() then
+            entity:SetCurrentBehavior(nil)
+            return
+        end
         -- 检查并释放待释放的技能
         if #entity.pendingSkills > 0 then
+            entity.actor:LookAt(entity.target:GetPosition(), true)
             local skill = table.remove(entity.pendingSkills, 1)
             skill:CastSkill(entity, entity.target)
             return
@@ -197,11 +202,6 @@ function MeleeBehavior:OnInit()
                     end
                 end
             end
-        end
-
-        if not entity.target or not entity.target:CanBeTargeted() then
-            entity:SetCurrentBehavior(nil)
-            return
         end
         
         local behavior = entity:GetCurrentBehavior()

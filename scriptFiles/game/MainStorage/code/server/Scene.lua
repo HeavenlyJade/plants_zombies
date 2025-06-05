@@ -1,29 +1,18 @@
---- V109 miniw-haima
-local print = print
-local setmetatable = setmetatable
-local SandboxNode = SandboxNode
-local Vector3 = Vector3
-local Enum = Enum
-local math = math
-local Vector2 = Vector2
-local ColorQuad = ColorQuad
-local wait = wait
-local game = game
-local pairs = pairs
-local next = next
-
 local MainStorage = game:GetService("MainStorage")
 local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
 local gg = require(MainStorage.code.common.MGlobal) ---@type gg
-local common_config = require(MainStorage.code.common.MConfig) ---@type common_config
 local common_const = require(MainStorage.code.common.MConst) ---@type common_const
 local NpcConfig = require(MainStorage.code.common.config.NpcConfig) ---@type NpcConfig
 local AfkSpotConfig = require(MainStorage.code.common.config.AfkSpotConfig) ---@type AfkSpotConfig
+local TriggerZoneConfig = require(MainStorage.code.common.config.TriggerZoneConfig) ---@type TriggerZoneConfig
 local ServerScheduler = require(MainStorage.code.server.ServerScheduler) ---@type ServerScheduler
+local Entity = require(MainStorage.code.server.entity_types.Entity) ---@type Entity
 
 local Monster = require(MainStorage.code.server.entity_types.Monster) ---@type Monster
 local Npc = require(MainStorage.code.server.entity_types.Npc) ---@type Npc
 local AfkSpot = require(MainStorage.code.server.entity_types.AfkSpot) ---@type AfkSpot
+local TriggerZone = require(MainStorage.code.server.entity_types.TriggerZone) ---@type TriggerZone
+
 
 local BagMgr = require(MainStorage.code.server.bag.BagMgr) ---@type BagMgr
 
@@ -64,7 +53,6 @@ end
 
 ---@return SandboxNode
 function _M:Get(path)
-    print(debug.traceback())
     local node = self.node
     local lastPart = ""
     for part in path:gmatch("[^/]+") do -- 用/分割字符串
@@ -101,6 +89,25 @@ function _M:initAfkSpots()
             end
         end
     end
+    local all_afk_spots = TriggerZoneConfig.GetAll()
+    gg.log("初始化挂机点", all_afk_spots)
+    for afk_name, afk_data in pairs(all_afk_spots) do
+        if afk_data["场景"] == self.name then
+            local sceneNode = self.node["挂机点"]
+            if sceneNode then
+                for _, node_name in ipairs(afk_data["节点名"]) do
+                    if sceneNode[node_name] then
+                        local actor = sceneNode[node_name]
+                        local afk_spot = TriggerZone.New(afk_data, actor)
+                        afk_spot.scene = self
+                        self.node2Entity[actor] = afk_spot
+                        self.npcs[afk_spot.uuid] = afk_spot
+                        afk_spot:ChangeScene(self)
+                    end
+                end
+            end
+        end
+    end
 end
 
 ---创建新的场景实例
@@ -122,6 +129,16 @@ function _M:OnInit(name, sceneId)
     self.scene_config = nil -- 当前地图的节点scene刷怪配置,
     self.npc_spawn_config = {} -- 当前地图的NPC刷新点
     self.node = game.WorkSpace["Ground"][name]
+    self.sceneZone = self.node["场景区域"] ---@type TriggerBox
+    self.sceneZone.Touched:Connect(function (node)
+        print("EnterScene", node)
+        if node then
+            local entity = Entity.node2Entity[node] ---@type Entity
+            if entity then
+                entity:ChangeScene(self)
+            end
+        end
+    end)
 
     self:initNpcs() -- Initialize NPCs after scene creation
     self:initAfkSpots() -- Initialize AfkSpots after scene creation
@@ -140,7 +157,7 @@ function _M:update_npcs()
 end
 
 function _M:OverlapSphere(center, radius, filterGroup, filterFunc)
-    local results = game:GetService('WorldService'):OverlapSphere(radius, 
+    local results = game:GetService('WorldService'):OverlapSphere(radius,
         Vector3.New(center.x, center.y, center.z), false, filterGroup)
     local retActors = {}
     for _, v in ipairs(results) do

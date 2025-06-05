@@ -21,6 +21,10 @@ function QuestCommand.main(params, player)
         player:RefreshQuest(keyword)
         return true
     end
+    if params["动作"] == "事件" then
+        player:ProcessQuestEvent(params["事件名"], params["推进数量"] or 1)
+        return true
+    end
 
     local quest = QuestConfig.Get(params["任务"]) ---@type Quest
     if not quest then

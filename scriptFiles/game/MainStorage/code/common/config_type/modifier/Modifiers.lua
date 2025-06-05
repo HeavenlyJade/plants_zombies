@@ -2,6 +2,7 @@
 local MainStorage = game:GetService('MainStorage')
 local ClassMgr      = require(MainStorage.code.common.ClassMgr)    ---@type ClassMgr
 local Modifier = require(MainStorage.code.common.config_type.modifier.Modifier)
+local gg = require(MainStorage.code.common.MGlobal)            ---@type gg
 local CastParam = require(MainStorage.code.server.spells.CastParam) ---@type CastParam
 
 
@@ -29,7 +30,9 @@ function _M:Check(caster, target, param)
         param = CastParam.New()
     end
     for _, modifier in ipairs(self.modifiers) do
-        modifier:Check(caster, target, param)
+        if modifier:Check(caster, target, param) then
+            break
+        end
     end
     return param
 end

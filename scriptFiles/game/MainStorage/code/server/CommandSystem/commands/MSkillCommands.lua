@@ -3,7 +3,6 @@
 
 local MainStorage = game:GetService("MainStorage")
 local gg = require(MainStorage.code.common.MGlobal)    ---@type gg
-local common_config = require(MainStorage.code.common.MConfig)  ---@type common_config
 local cloudDataMgr = require(MainStorage.code.server.MCloudDataMgr)  ---@type MCloudDataMgr
 local Skill = require(MainStorage.code.server.spells.Skill) ---@type Skill
 local SkillEventConfig = require(MainStorage.code.common.event_conf.event_skill) ---@type SkillEventConfig
@@ -52,8 +51,15 @@ function SkillCommands.unlock(params, player)
 end
 
 
-function SkillCommands.loadSkill(params, player)
-    -- 你的装载逻辑
+function SkillCommands.afk(params, player)
+    local action = params["操作"] or "进入挂机"
+    if action == "进入挂机" then
+        player:SendEvent("AfkSpotUpdate", {enter = true})
+        player:EnterBattle()
+    elseif action == "离开挂机" then
+        player:SendEvent("AfkSpotUpdate", {enter = false})
+        player:ExitBattle()
+    end
 end
 
 -- --装载配置的文件的技能

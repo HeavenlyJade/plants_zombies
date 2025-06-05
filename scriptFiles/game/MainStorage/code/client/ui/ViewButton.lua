@@ -142,7 +142,7 @@ function ViewButton:OnInit(node, ui, path, realButtonPath)
     end
     local img = self.img
     self.img.ClickPass = false
-    self.clickCb = nil ---@type function(ui:ViewBase, button:ViewButton)
+    self.clickCb = nil ---@type fun(ui:ViewBase, button:ViewButton)
     self.touchBeginCb = nil
     self.touchMoveCb = nil
     self.touchEndCb = nil

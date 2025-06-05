@@ -31,7 +31,9 @@ SkillEventConfig.RESPONSE = {
     DETAIL = "SkillResponse_Detail",
     AVAILABLE = "SkillResponse_Available",
     ERROR = "SkillResponse_Error",
-    UPGRADE = "SkillResponse_Upgrade"
+    UPGRADE = "SkillResponse_Upgrade",
+    SYNC_SKILLS = "SyncPlayerSkills"
+
 }
 
 -- 服务器通知事件

@@ -10,7 +10,8 @@ local ModelPlayer = ClassMgr.Class("ModelPlayer")
 
 
 ---@param animator Animator
-function ModelPlayer:OnInit(animator, stateConfig)
+function ModelPlayer:OnInit(name, animator, stateConfig)
+    self.name = name
     self.animator = animator
     self.finishTask = nil
     self.stateConfig = stateConfig

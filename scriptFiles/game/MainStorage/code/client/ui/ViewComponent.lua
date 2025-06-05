@@ -25,6 +25,10 @@ function ViewComponent:OnInit(node, ui, path)
     self.extraParams = {} -- 可在此存储任意与该按钮相关的数据
 end
 
+function ViewComponent:GetGlobalPos()
+    
+end
+
 function ViewComponent:SetGray(isGray)
     self.node.Grayed = isGray
 end

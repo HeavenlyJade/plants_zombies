@@ -1,5 +1,6 @@
 local MainStorage = game:GetService('MainStorage')
 local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
+local gg = require(MainStorage.code.common.MGlobal) ---@type gg
 local TagHandler = require(MainStorage.code.common.config_type.tags.TagHandler) ---@type TagHandler
 local DamageAmplifier = require(MainStorage.code.common.config_type.modifier.DamageAmplifier) ---@type DamageAmplifier
 local CastParam = require(MainStorage.code.server.spells.CastParam) ---@type CastParam
@@ -23,7 +24,7 @@ function AttributeTag:OnInit(data)
 end
 
 function AttributeTag:TriggerReal(caster, target, castParam, param, log)
-    local battle = param[1] ---@type Battle
+    local battle = param ---@type Battle
     
     -- 处理基础属性增加
     if self["增加"] ~= 0 then

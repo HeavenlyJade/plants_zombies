@@ -48,6 +48,7 @@ function Spell:OnInit( data )
     self.spellName = data["魔法名"] or ""
     self.printInfo = data["打印信息"] or false
     self.comment = data["注释"] or ""
+    self.chance = data["几率"] or 0
     self.cooldown = data["冷却"] or 0
     self.cooldownSpeed = data["冷却加速"] or 1
     self.targetCooldown = data["各目标冷却"] or 0
@@ -58,10 +59,7 @@ function Spell:OnInit( data )
     self.widthScale = data["宽度倍率"] or 1
     self.heightScale = data["高度倍率"] or 1
     self.sizeScale = data["尺寸倍率"] or 1
-
-    -- 直接使用配置中的Modifiers实例
-    self.selfConditions = data["自身条件"] or {}
-    self.targetConditions = data["目标条件"] or {}
+    self.targetConditions = data["释放条件"] ---@type Modifiers
     self.requireTarget = data["必须要目标"]
     if self.requireTarget == nil then
         self.requireTarget = true
@@ -202,7 +200,7 @@ function Spell:Cast(caster, target, param)
 
     self:PlayEffect(self.preCastEffects, caster, param.realTarget, param)
 
-    table.insert(log, string.format("%s: %s对%s释放通过", self.spellName, caster.name, self:GetName(target)))
+    table.insert(log, string.format("%s: %s对%s释放通过, 威力%s", self.spellName, caster.name, self:GetName(target), param.power))
     local delay = param:GetValue(self, "延迟", self.delay)
     if delay > 0 then
         if self.printInfo then
@@ -210,6 +208,7 @@ function Spell:Cast(caster, target, param)
             print(table.concat(log, "\n"))
         end
         ServerScheduler.Add(function()
+            self:PlayEffect(self.castEffects, caster, target, param)
             self:CastReal(caster, target, param)
         end, delay)
         return true
@@ -217,6 +216,7 @@ function Spell:Cast(caster, target, param)
         if self.printInfo and #log > 0 then
             print(table.concat(log, "\n"))
         end
+        self:PlayEffect(self.castEffects, caster, target, param)
         return self:CastReal(caster, target, param)
     end
 end
@@ -232,8 +232,7 @@ function Spell:PlayEffect(effects, playFrom, playAt, param, targetMode)
     if not effects then return nil end
     local actions = {}
     for i, effect in ipairs(effects) do
-        if effect and (not targetMode or targetMode == effect.targeter) then
-            print("播放特效", effect.targeter, playFrom, playAt)
+        if effect and effect:IsTargeter(targetMode) then
             effect:PlayAt(playFrom, playAt, param, actions)
         end
     end
@@ -282,38 +281,41 @@ function Spell:CanCast(caster, target, param, log, checkCd)
     if checkCd == nil then
         checkCd = true
     end
-    if checkCd and self.cooldown > 0 and caster:IsCoolingdown(self.spellName) then
-        if log then
-            log[#log + 1] = string.format("%s：冷却中", self.spellName)
+    if checkCd then
+        if  self.cooldown > 0 and caster:IsCoolingdown(self.spellName) then
+            if log then
+                log[#log + 1] = string.format("%s：冷却中", self.spellName)
+            end
+            return false
         end
-        return false
+
+        if  self.targetCooldown > 0 and self:IsEntity(target) and caster:IsCoolingdown(self.spellName, target) then
+            if log then
+                log[#log + 1] = string.format("%s：对该目标冷却中", self.spellName)
+            end
+            return false
+        end
+        if self.chance > 0 then
+            local randomValue = math.random() * 100
+            if randomValue > self.chance then
+                if log then
+                    log[#log + 1] = string.format("%s：释放几率未触发 (%.1f%% > %.1f%%)", self.spellName, randomValue, self.chance)
+                end
+                return false
+            end
+        end
     end
 
-    if checkCd and self.targetCooldown > 0 and self:IsEntity(target) and caster:IsCoolingdown(self.spellName, target) then
-        if log then
-            log[#log + 1] = string.format("%s：对该目标冷却中", self.spellName)
-        end
-        return false
-    end
-
-    if #self.selfConditions > 0 then
-        for _, condition in ipairs(self.selfConditions) do
-            local stop = condition:Check(caster, caster, param)
+    if self.targetConditions then
+        for i, item in ipairs(self.targetConditions.modifiers) do
+            local stop = item:Check(caster, target, param)
             if stop then break end
-        end
-    end
-
-    if param.cancelled then
-        if log then
-            log[#log + 1] = string.format("%s：自身条件不满足", self.spellName)
-        end
-        return false
-    end
-
-    if #self.targetConditions > 0 and self:IsEntity(target) then
-        for _, condition in ipairs(self.targetConditions) do
-            local stop = condition:Check(caster, target, param)
-            if stop then break end
+            if param.cancelled then
+                if self.printInfo then 
+                    table.insert(log, string.format("%s释放失败：第%d个自身条件不满足 条件=%s", self.spellName, i+1, item.condition.condition))
+                end
+                break
+            end
         end
     end
 

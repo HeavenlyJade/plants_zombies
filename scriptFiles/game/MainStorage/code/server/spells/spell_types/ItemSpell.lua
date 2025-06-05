@@ -31,8 +31,8 @@ function ItemSpell:CastReal(caster, target, param)
     if not target.isPlayer then return false end ---@cast target Player
     
     local battle = Battle.New(caster, target, self.spellName, nil)
-    local amount = param:GetValue(self, "baseAmount", self.baseAmount)
-    local multiplier = param:GetValue(self, "baseMultiplier", self.baseMultiplier) * param.power
+    local amount = param:GetValue(self, "基础数量", self.baseAmount)
+    local multiplier = param:GetValue(self, "基础倍率", self.baseMultiplier) * param.power
     
     if amount > 0 then
         battle:AddModifier("BASE", "增加", amount * multiplier)

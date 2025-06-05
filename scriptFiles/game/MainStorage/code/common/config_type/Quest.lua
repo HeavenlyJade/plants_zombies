@@ -1,5 +1,6 @@
 local MainStorage = game:GetService('MainStorage')
 local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
+local gg            = require(MainStorage.code.common.MGlobal) ---@type gg
 local Modifiers = require(MainStorage.code.common.config_type.modifier.Modifiers) ---@type Modifiers
 local ItemTypeConfig = require(MainStorage.code.common.config.ItemTypeConfig) ---@type ItemTypeConfig
 
@@ -15,7 +16,8 @@ local QuestRefreshType = {
 local QuestType = {
     NONE = "无类型",
     VARIABLE = "变量",
-    ITEM = "物品"
+    ITEM = "物品",
+    EVENT = "事件"
 }
 
 ---@class Quest:Class
@@ -34,8 +36,11 @@ function Quest:OnInit(data)
     
     self.questVariable = data["任务变量"]
     self.requiredItem = ItemTypeConfig.Get(data["需求物品"])
+    self.eventName = data["事件名"]
     self.completionRewards = data["完成奖励"] ---@type table<string, number>
     self.mailRewards = data["完成奖励_邮件"] ---@type table<string, number>
+    self.completionCommands = data["完成指令"] ---@type string[]
+    self.gotoSceneNode = data["前往场景节点"] ---@type string
     self.nextQuest = data["自动领取下一任务"]
     self.refreshType = data["刷新类型"] or QuestRefreshType.NONE
     
@@ -49,6 +54,18 @@ function Quest:OnInit(data)
     self.rewards = data["奖励"]
 end
 
+---@param player Player
+function Quest:OnClick(player)
+    if self.gotoSceneNode then
+        local node = gg.GetSceneNode(self.gotoSceneNode)
+        if not node then
+            gg.log("任务%s有不存在的节点%s", self.name, self.gotoSceneNode)
+            return
+        end
+        print("targetPos", node.Position, player.actor.Position)
+        player.actor:MoveTo(node.Position)
+    end
+end
 
 --玩家当前是否有此任务
 function Quest:Has(player)
@@ -63,6 +80,12 @@ function Quest:Has(player)
     end
     
     return false
+end
+
+function Quest:GetToStringParams()
+    return {
+        name = self.name
+    }
 end
 
 function Quest:Accept(player)

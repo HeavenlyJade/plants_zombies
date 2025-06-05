@@ -2,6 +2,7 @@ local MainStorage = game:GetService("MainStorage")
 local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
 local ClientScheduler = require(MainStorage.code.client.ClientScheduler) ---@type ClientScheduler
 local gg = require(MainStorage.code.common.MGlobal) ---@type gg
+local ClientEventManager = require(MainStorage.code.client.event.ClientEventManager) ---@type ClientEventManager
 
 local displayingUI = {}
 local allUI = {}
@@ -91,6 +92,12 @@ function ViewBase:OnInit(node, config)
     else
         self:Open()
     end
+end
+
+function ViewBase:GetScreenSize()
+    local evt = {}
+    ClientEventManager.Publish("GetScreenSize", evt)
+    return evt.size
 end
 
 function ViewBase:SetVisible(visible)
