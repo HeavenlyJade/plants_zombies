@@ -11,7 +11,6 @@ local SubSpell = require(MainStorage.code.server.spells.SubSpell) ---@type SubSp
 local MultiSpell = ClassMgr.Class("MultiSpell", Spell)
 
 function MultiSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.randomOrder = data["随机顺序"] or false
     self.castCount = data["释放个数"] or 999
     self.isCombo = data["组合技"] or false

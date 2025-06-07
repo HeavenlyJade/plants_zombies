@@ -243,8 +243,8 @@ local function LoadConfig()
             nil
         }
     }),
-    ["体力"] = ItemType.New({
-        ["名字"] = "体力",
+    ["水晶"] = ItemType.New({
+        ["名字"] = "水晶",
         ["额外战力"] = 0,
         ["强化倍率"] = 0,
         ["强化材料增加倍率"] = 0,
@@ -257,8 +257,8 @@ local function LoadConfig()
         ["是货币"] = true,
         ["货币序号"] = 3
     }),
-    ["水晶"] = ItemType.New({
-        ["名字"] = "水晶",
+    ["能量豆"] = ItemType.New({
+        ["名字"] = "能量豆",
         ["额外战力"] = 0,
         ["强化倍率"] = 0,
         ["强化材料增加倍率"] = 0,
@@ -297,7 +297,7 @@ local function LoadConfig()
         ["售出价格"] = 0,
         ["在背包里显示"] = true,
         ["是货币"] = true,
-        ["货币序号"] = 2
+        ["货币序号"] = 1
     })
 }loaded = true
     gg.log("LoadConfig", ItemTypeConfig.config)

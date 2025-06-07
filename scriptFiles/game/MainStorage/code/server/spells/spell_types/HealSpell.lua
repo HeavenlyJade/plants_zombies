@@ -13,7 +13,6 @@ local DamageAmplifier = require(MainStorage.code.common.config_type.modifier.Dam
 local HealSpell = ClassMgr.Class("HealSpell", Spell)
 
 function HealSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.baseHeal = data["基础治疗"] or 0
     self.baseMultiplier = data["基础倍率"] or 1
     self.damageAmplifier = DamageAmplifier.Load(data["属性增伤"]) ---@type DamageAmplifier[]

@@ -133,7 +133,6 @@ function ViewButton:OnClick()
 end
 
 function ViewButton:OnInit(node, ui, path, realButtonPath)
-    ViewComponent.OnInit(self, node, ui, path)
     self.childClickImgs = {    }
     self.enabled = true
     self.img = node ---@type UIImage

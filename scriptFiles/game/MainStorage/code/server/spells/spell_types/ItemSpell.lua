@@ -14,7 +14,6 @@ local ItemTypeConfig = require(MainStorage.code.common.config.ItemTypeConfig) --
 local ItemSpell = ClassMgr.Class("ItemSpell", Spell)
 
 function ItemSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.itemType = ItemTypeConfig.Get(data["物品类型"])
     self.baseAmount = data["基础数量"] or 0
     self.baseMultiplier = data["基础倍率"] or 1

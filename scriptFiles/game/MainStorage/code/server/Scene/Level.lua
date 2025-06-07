@@ -6,12 +6,13 @@ local ServerScheduler = require(MainStorage.code.server.ServerScheduler) ---@typ
 local ServerEventManager = require(MainStorage.code.server.event.ServerEventManager) ---@type ServerEventManager
 
 ---@class Level
----@field New fun( levelType:LevelType, sceneNode:SandboxNode, index:number, scene:Scene ):Level
+---@field New fun( levelType:LevelType, scene:Scene, index:number ):Level
 local Level = ClassMgr.Class("Level")
 
 ---@param levelType LevelType
-function Level:OnInit(levelType, sceneNode, index, scene)
+function Level:OnInit(levelType, scene, index)
     self.scene = scene ---@type Scene
+    local sceneNode = scene.node
     self.levelType = levelType
     -- 玩家进入点
     self.entries = {} ---@type Transform[]
@@ -196,7 +197,6 @@ end
 ---更新关卡状态
 function Level:Update()
     if not self.isActive or not self.currentWave then return end
-
     local newTimeElapsed = os.time() - self.waveStartTime
 
     -- 检查是否需要开始新的刷怪波次

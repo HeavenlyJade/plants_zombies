@@ -14,7 +14,6 @@ local TagBuffSpell = ClassMgr.Class("TagBuffSpell", BuffSpell)
 local TagBuff = ClassMgr.Class("TagBuff", BuffSpell.ActiveBuff)
 
 function TagBuffSpell:OnInit(data)
-    BuffSpell.OnInit(self, data)
     
     -- 从配置中读取词条BUFF相关属性并加载词条类型
     self.tagTypes = {}

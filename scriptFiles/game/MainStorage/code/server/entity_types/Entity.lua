@@ -112,11 +112,6 @@ function _M:OnInit(info_)
     self.outlineTimer = nil
 end
 
-function _M:SetActor(actor)
-    self.actor = actor
-    _M.node2Entity[actor] = self
-end
-
 ---@protected
 _M.GenerateUUID = function(self)
     return ""
@@ -721,10 +716,12 @@ end
 -- 设置游戏场景中使用的actor实例
 function _M:setGameActor(actor_)
     self.actor = actor_
-    -- self.actor:UseDefaultAnimation(false);     --取消默认动作(自行用代码控制)
+    _M.node2Entity[actor_] = self
 
-    actor_.PhysXRoleType = Enum.PhysicsRoleType.BOX
-    actor_.IgnoreStreamSync = false
+    if actor_:IsA("Actor") then
+        actor_.PhysXRoleType = Enum.PhysicsRoleType.BOX
+        actor_.IgnoreStreamSync = false
+    end
 end
 
 -- 同步给客户端当前目标的资料

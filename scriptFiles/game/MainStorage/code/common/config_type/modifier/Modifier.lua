@@ -4,6 +4,8 @@ local ClassMgr      = require(MainStorage.code.common.ClassMgr)    ---@type Clas
 local SubSpell = require(MainStorage.code.server.spells.SubSpell) ---@type SubSpell
 local Condition = require(MainStorage.code.common.config_type.modifier.Condition) ---@type Condition
 local gg = require(MainStorage.code.common.MGlobal)            ---@type gg
+local Entity = require(MainStorage.code.server.entity_types.Entity) ---@type Entity
+local DummyEntity = require(MainStorage.code.server.entity_types.DummyEntity) ---@type DummyEntity
 
 ---@class Modifier
 local _M = ClassMgr.Class("Modifier")
@@ -40,12 +42,19 @@ function _M:GetTarget(caster, target, targeter, targeterPath)
     elseif targeter == "自己" then
         return caster
     else
-        print("targeter", targeter)
         if not targeterPath then
             return target
         end
         local scene = target.scene ---@type Scene
-        return scene.node2Entity[scene:Get(targeterPath)]
+        local node = scene:Get(targeterPath)
+        if not node then
+            return target
+        end
+        local entity = Entity.node2Entity[node]
+        if not entity then
+            entity = DummyEntity.New(node)
+        end
+        return entity
     end
 end
 

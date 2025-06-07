@@ -164,7 +164,6 @@ end
 ---@class ParticleGraphic:Graphic
 local ParticleGraphic = ClassMgr.Class("ParticleGraphic", Graphic)
 function ParticleGraphic:OnInit( data )
-    Graphic.OnInit(self, data)
     self.particleName = data["特效对象"]
     self.particleAssetId = data["特效资产"] or nil
     self.boundToEntity = data["绑定实体"] or false
@@ -209,7 +208,6 @@ end
 ---@class AnimationGraphic:Graphic
 local AnimationGraphic = ClassMgr.Class("AnimationGraphic", Graphic)
 function AnimationGraphic:OnInit( data )
-    Graphic.OnInit(self, data)
     self.animationName = data["播放动画"]
     self.playbackSpeed = data["播放速度"]
 end
@@ -225,7 +223,6 @@ end
 local CameraShakeGraphic = ClassMgr.Class("CameraShakeGraphic", Graphic)
 
 function CameraShakeGraphic:OnInit( data )
-    Graphic.OnInit(self, data)
     self.rotation = data["旋转"] ---@type Vector2
     self.position = data["位移"] ---@type Vector3
     self.tweenStyle = data["动画风格"]
@@ -250,7 +247,6 @@ end
 ---@class ModelGraphic:Graphic
 local ModelGraphic = ClassMgr.Class("ModelGraphic", Graphic)
 function ModelGraphic:OnInit( data )
-    Graphic.OnInit(self, data)
     self.modelName = data["模型对象"]
     self.stateMachine = data["模型状态机"]
     self.animationName = data["播放动画"]

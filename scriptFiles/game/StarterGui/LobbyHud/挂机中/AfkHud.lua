@@ -17,7 +17,6 @@ local uiConfig = {
 }
 
 function AfkHud:OnInit(node, config)
-    ViewBase.OnInit(self, node, config)
     self.gainSpeed = self:Get("挂机底图/获取速度") ---@type ViewComponent
     
     -- 用于跟踪阳光变化

@@ -36,8 +36,6 @@ local _M = ClassMgr.Class('Monster', Entity)
 
 -- 初始化怪物
 function _M:OnInit(info_)
-    Entity.OnInit(self, info_) -- 父类初始化
-
     -- 设置怪物类型和等级
     self.mobType = info_.mobType
     self.level = info_.level or self.mobType.data["基础等级"] or 1

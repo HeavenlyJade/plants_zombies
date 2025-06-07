@@ -16,8 +16,10 @@ SkillEventConfig.REQUEST = {
     GET_LIST = "SkillRequest_GetList",
     LEARN = "SkillRequest_Learn",
     UPGRADE = "SkillRequest_Upgrade",
+    UPGRADE_ALL = "SkillRequest_UpgradeAll", -- 一键强化请求
     EQUIP = "SkillRequest_Equip",
     UNEQUIP = "SkillRequest_Unequip",
+    DESTROY = "SkillRequest_Destroy", -- 销毁技能请求
     GET_DETAIL = "SkillRequest_GetDetail",
     GET_AVAILABLE = "SkillRequest_GetAvailable"
 }
@@ -28,10 +30,12 @@ SkillEventConfig.RESPONSE = {
     LEARN = "SkillResponse_LearnUpgrade",
     EQUIP = "SkillResponse_Equip",
     UNEQUIP = "SkillResponse_Unequip",
+    DESTROY = "SkillResponse_Destroy", -- 销毁技能响应
     DETAIL = "SkillResponse_Detail",
     AVAILABLE = "SkillResponse_Available",
     ERROR = "SkillResponse_Error",
     UPGRADE = "SkillResponse_Upgrade",
+    UPGRADE_ALL = "SkillResponse_UpgradeAll", -- 一键强化响应
     SYNC_SKILLS = "SyncPlayerSkills"
 
 }
@@ -63,7 +67,15 @@ SkillEventConfig.ERROR_CODES = {
     PERMISSION_DENIED = 10,
     INVALID_PARAMETERS = 11,
     SKILL_NOT_OWNED = 12,
-    UPGRADE_FAILED = 13
+    UPGRADE_FAILED = 13,
+    SKILL_NOT_EQUIPPED = 14,
+    UNEQUIP_FAILED = 15,
+    UPGRADE_ALL_FAILED = 16, -- 一键强化失败
+    SKILL_NOT_SUPPORT_UPGRADE_ALL = 17, -- 技能不支持一键强化
+    PARTIAL_UPGRADE_SUCCESS = 18, -- 部分升级成功（一键强化过程中资源不足）
+    DESTROY_FAILED = 19, -- 销毁技能失败
+    SKILL_CANNOT_DESTROY = 20, -- 技能不可销毁
+    DESTROY_HAS_DEPENDENCIES = 21 -- 技能有依赖无法销毁
 }
 
 -- 错误消息映射
@@ -81,7 +93,15 @@ SkillEventConfig.ERROR_MESSAGES = {
     [SkillEventConfig.ERROR_CODES.PERMISSION_DENIED] = "权限不足",
     [SkillEventConfig.ERROR_CODES.INVALID_PARAMETERS] = "参数无效",
     [SkillEventConfig.ERROR_CODES.SKILL_NOT_OWNED] = "技能不属于玩家",
-    [SkillEventConfig.ERROR_CODES.UPGRADE_FAILED] = "升级失败"
+    [SkillEventConfig.ERROR_CODES.UPGRADE_FAILED] = "升级失败",
+    [SkillEventConfig.ERROR_CODES.SKILL_NOT_EQUIPPED] = "技能未装备",
+    [SkillEventConfig.ERROR_CODES.UNEQUIP_FAILED] = "卸下失败",
+    [SkillEventConfig.ERROR_CODES.UPGRADE_ALL_FAILED] = "一键强化失败",
+    [SkillEventConfig.ERROR_CODES.SKILL_NOT_SUPPORT_UPGRADE_ALL] = "该技能不支持一键强化",
+    [SkillEventConfig.ERROR_CODES.PARTIAL_UPGRADE_SUCCESS] = "一键强化部分成功，资源不足无法升级到满级",
+    [SkillEventConfig.ERROR_CODES.DESTROY_FAILED] = "销毁技能失败",
+    [SkillEventConfig.ERROR_CODES.SKILL_CANNOT_DESTROY] = "该技能不可销毁",
+    [SkillEventConfig.ERROR_CODES.DESTROY_HAS_DEPENDENCIES] = "该技能存在依赖关系，无法销毁"
 }
 
 --[[

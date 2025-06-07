@@ -18,7 +18,6 @@ local uiConfig = {
     uiName = "BattleHud",
     layer = 0,
     hideOnInit = not MainStorage:GetAttribute("初始是战斗状态"), -- 初始隐藏，当玩家靠近NPC时显示
-    initHudInteract = false
 }
 
 -- 缓存技能数据

@@ -18,7 +18,7 @@ local MainStorage = game:GetService("MainStorage")
 local gg                = require(MainStorage.code.common.MGlobal)    ---@type gg
 local common_const      = require(MainStorage.code.common.MConst)     ---@type common_const
 local Player       = require(MainStorage.code.server.entity_types.Player)          ---@type Player
-local MTerrain      = require(MainStorage.code.server.MTerrain)         ---@type MTerrain
+local Scene      = require(MainStorage.code.server.Scene)         ---@type Scene
 local bagMgr        = require(MainStorage.code.server.bag.BagMgr)          ---@type BagMgr
 local cloudDataMgr  = require(MainStorage.code.server.MCloudDataMgr)    ---@type MCloudDataMgr
 local ServerEventManager = require(MainStorage.code.server.event.ServerEventManager) ---@type ServerEventManager
@@ -37,7 +37,10 @@ function MainServer.start_server()
 
     gg.log('主服务器开始初始化');
     MainServer.initModule()
-    MTerrain.init()                       --地形管理
+    for _, node in  pairs(game.WorkSpace.Ground.Children) do
+        print("node", node.Name)
+        Scene.New( node )
+    end
     MainServer.createNetworkChannel()     --建立网络通道
     wait(1)                               --云服务器启动配置文件下载和解析繁忙，稍微等待
     MainServer.bind_update_tick()         --开始tick
@@ -167,8 +170,6 @@ function MainServer.player_enter_game(player)
 
     player_:setGameActor(actor_)     --player
     actor_.CollideGroupID = 4
-    player_:ChangeScene('g0')       --默认g0大厅
-
     player_:setPlayerNetStat(common_const.PLAYER_NET_STAT.LOGIN_IN)    --player_net_stat login ok
 
     player_:initSkillData()                 --- 加载玩家技能

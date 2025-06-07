@@ -198,7 +198,6 @@ function ActiveBuff:CastAgain(param)
 end
 
 function BuffSpell:OnInit(data)
-    Spell.OnInit(self, data)
     
     -- 从配置中读取Buff相关属性
     self.duration = data["持续时间"] or 0

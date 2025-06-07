@@ -10,10 +10,19 @@ local gg = require(MainStorage.code.common.MGlobal) ---@type gg
 ---@field spells table 定时释放魔法列表
 ---@field lastCastTime number 上次释放时间
 ---@field activePlayers table<Player, number> 当前激活的玩家及其定时器ID
+---@field isOccupied boolean 是否已被占用
 local AfkSpot = ClassMgr.Class("AfkSpot", Npc)
 
+---处理玩家进入触发器
+---@param player Player 玩家
+function AfkSpot:OnPlayerTouched(player)
+    if self.isOccupied then
+        return
+    end
+    Npc.OnPlayerTouched(self, player)
+end
+
 function AfkSpot:OnInit(data, actor)
-    Npc.OnInit(self, data, actor)
     self.autoInteract = data["自动互动"] or false
     self.interval = data["间隔时间"] or 10
     self.subSpells = {}
@@ -25,6 +34,7 @@ function AfkSpot:OnInit(data, actor)
     end
     self.lastCastTime = 0
     self.activePlayers = {}
+    self.isOccupied = false
     
     self:SubscribeEvent("ExitAfkSpot", function (evt)
         if evt.player then
@@ -37,6 +47,9 @@ end
 ---@param player Player 玩家
 ---@return boolean 是否可以进入
 function AfkSpot:CanEnter(player)
+    if self.isOccupied then
+        return false
+    end
     if not self.interactCondition then return true end
     local param = self.interactCondition:Check(player, self)
     return not param.cancelled
@@ -45,6 +58,7 @@ end
 --- 玩家进入挂机点
 ---@param player Player 玩家
 function AfkSpot:OnPlayerEnter(player)
+    self.isOccupied = true
     player:SetMoveable(false)
     -- 发送挂机收益事件给客户端
     player:SendEvent("AfkSpotEntered", {
@@ -65,6 +79,7 @@ function AfkSpot:OnPlayerExit(player)
         ServerScheduler.cancel(timerId)
         self.activePlayers[player] = nil
         player:SetMoveable(true)
+        self.isOccupied = false
     end
 end
 

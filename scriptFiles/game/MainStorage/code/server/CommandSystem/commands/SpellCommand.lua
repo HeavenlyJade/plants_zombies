@@ -94,6 +94,13 @@ function SpellCommand.graphic(params, player)
 end
 
 ---@param player Player
+function SpellCommand.focusOn(params, player)
+    player.focusOnCommandsCb = params["聚焦UI"]["完成时执行指令"]
+    player:SendEvent("FocusOnUI", params["聚焦UI"])
+    return true
+end
+
+---@param player Player
 function SpellCommand.var(params, player)
     local value = tonumber(params["值"])
     if not value then

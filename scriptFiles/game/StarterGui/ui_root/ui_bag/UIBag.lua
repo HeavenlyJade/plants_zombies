@@ -19,7 +19,6 @@ local UiBag = ClassMgr.Class("UiBag", ViewBase)
 
 ---@override
 function UiBag:OnInit(node, config)
-    ViewBase.OnInit(self, node, config)
     
     self.items = {} ---@type table<number, table<number, Item>>
     

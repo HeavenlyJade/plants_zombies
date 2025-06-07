@@ -9,9 +9,6 @@ local CastParam = require(MainStorage.code.server.spells.CastParam) ---@type Cas
 local AttributeTag = ClassMgr.Class("AttributeTag", TagHandler)
 
 function AttributeTag:OnInit(data)
-    -- 初始化父类
-    TagHandler.OnInit(self, data)
-    
     -- 初始化AttributeTag特有属性
     self["属性"] = data["属性"] or "" ---@type string
     self["增加"] = data["增加"] or 0 ---@type number

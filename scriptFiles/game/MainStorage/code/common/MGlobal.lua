@@ -961,59 +961,6 @@ function gg.cloneFromTemplate(name_)
     end
 end
 
--- 是否是身上穿的位置
----@param pos_ number 位置值
----@return boolean 是否是装备位置
-function gg.isWearPos(pos_)
-    return (pos_ > 1000 and pos_ < 10000)
-end
-
--- 传送到一个坐标，传入参数是碰撞体
----@param node_ SandboxNode 碰撞体节点
----@param pos_ Vector3 目标位置
----@param scene_name_ string 场景名称
-function gg.teleportToPosition(node_, pos_, scene_name_)
-    -- 传送三次，确保传送成功
-    for i = 1, 3 do
-        wait(0.01)
-        local player_ = gg.getPlayerByUin(node_.OwnerUin)
-        if player_ then
-            player_:ChangeScene(scene_name_)
-        end
-        node_.Position = Vector3.New(pos_.x, pos_.y + 300, pos_.z)
-    end
-end
-
--- 传送到一个坐标，传入参数是玩家
----@param player_ Player 玩家对象
----@param pos_ Vector3 目标位置
----@param scene_name_ string 场景名称
-function gg.playerTeleportToPostion(player_, pos_, scene_name_)
-
-    local nessesary_base_obj_ = game.WorkSpace:WaitForChild("Ground"):WaitForChild(scene_name_).base
-    gg.log("try nessesary_obj:", nessesary_base_obj_)
-    if nessesary_base_obj_ then
-        local listener
-        listener = nessesary_base_obj_.LoadFinish:connect(function(ret)
-            gg.log("nessesary_obj LoadFinish:", ret, nessesary_base_obj_)
-            listener:disconnect()
-            listener = nil
-            player_.actor.Position = Vector3.New(pos_.x, pos_.y + 300, pos_.z)
-        end)
-    else
-        gg.log('nessesary_base_obj_ not exist')
-    end
-
-    -- 传送三次，确保传送成功
-    for i = 1, 3 do
-        wait(0.01)
-        if player_ then
-            player_:ChangeScene(scene_name_)
-            player_.actor.Position = Vector3.New(pos_.x, pos_.y + 300, pos_.z)
-        end
-    end
-
-end
 
 ---@param node SandboxNode
 ---@param path string
@@ -1079,8 +1026,6 @@ end
 function gg.clientPickPress()
     -- 按下
     local function inputBegan(inputObj, bGameProcessd)
-        gg.log("InputBegan", inputObj, bGameProcessd, inputObj.UserInputState, inputObj.UserInputType)
-
         if inputObj.UserInputType == Enum.UserInputType.MouseButton1.Value then
             local obj_list = {} -- 表示只在哪些obj里面查找
             for k, v in pairs(gg.clentGetContainerMonster().Children) do

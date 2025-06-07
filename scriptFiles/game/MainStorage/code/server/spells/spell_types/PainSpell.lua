@@ -17,7 +17,6 @@ local DamageAmplifier = require(MainStorage.code.common.config_type.modifier.Dam
 local PainSpell = ClassMgr.Class("PainSpell", Spell)
 
 function PainSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.baseDamage = data["基础伤害"] or 0
     self.baseMultiplier = data["基础倍率"] or 1
     self.extraStats = data["额外属性"] or {}

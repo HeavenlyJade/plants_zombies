@@ -35,7 +35,6 @@ local _M = ClassMgr.Class('Player', Entity)
 
 -- 初始化玩家
 function _M:OnInit(info_)
-    Entity:OnInit(info_)                                       -- 父类初始化
     self.name = info_.nickname
     self.isPlayer = true
     self.bag = nil ---@type Bag
@@ -54,6 +53,14 @@ function _M:OnInit(info_)
     self.equippedSkills = {} ---@type table<number, string>
     self.skillCastabilityTask = nil ---@type number 技能可释放状态检查任务ID
     self._moveMethod = nil
+    self.focusOnCommandsCb = nil
+
+    self:SubscribeEvent("FinishFocusUI", function (evt)
+        if self.focusOnCommandsCb then
+            self:ExecuteCommands(self.focusOnCommandsCb)
+            self.focusOnCommandsCb = nil
+        end
+    end)
 
     self:SubscribeEvent("ClickQuest", function (evt)
         local quest = self.quests[evt.name]
@@ -63,6 +70,14 @@ function _M:OnInit(info_)
             return
         end
         quest.quest:OnClick(self)
+    end)
+
+    self:SubscribeEvent("NavigateReached", function()
+        print("NavigateReached", self.navigateCb)
+        if self.navigateCb then
+            self.navigateCb()
+            self.navigateCb = nil
+        end
     end)
 
     self:SubscribeEvent("CastSpell", function (evt)
@@ -108,6 +123,14 @@ end
 ---标记红点
 function _M:MarkNew(path)
 
+end
+
+function _M:NavigateTo(position, stopRange, cb)
+    self.navigateCb = cb
+    self:SendEvent("NavigateTo", {
+        pos = {position.x, position.y, position.z},
+        range = stopRange,
+    })
 end
 
 function _M:RefreshQuest(key)
@@ -380,6 +403,23 @@ function _M:UnequipSkill(slot)
         self:RefreshStats()
 
         -- 保存配置
+        self:saveSkillConfig()
+        return true
+    end
+    return false
+end
+
+function _M:LearnSkill(skillType)
+    local skillId = skillType.name
+    local foundSkill = self.skills[skillType.name]
+    -- 如果技能不存在
+    if not foundSkill then
+        -- 创建新技能
+        self.skills[skillId] = Skill.New(self, {
+            skill = skillType.name,
+            level = 1,
+            slot = 0
+        })
         self:saveSkillConfig()
         return true
     end

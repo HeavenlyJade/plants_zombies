@@ -138,10 +138,10 @@ function ModelPlayer:SwitchState(stateId, speed)
             self:PlayTransition("无")
         end, playTime - 0.1)
     end
-    -- local playTime = self.animator:GetCurrentStatePlayedTime(0)
-    -- gg.log("playTime", stateId, playTime)
-    -- local playTimeByStr = self.animator:GetStatePlayedTime(stateId)
-    -- gg.log("playTimeByStr", stateId, playTimeByStr)
+    local playTime = self.animator:GetCurrentStatePlayedTime(0)
+    gg.log("playTime", stateId, playTime)
+    local playTimeByStr = self.animator:GetStatePlayedTime(stateId)
+    gg.log("playTimeByStr", stateId, playTimeByStr)
     self.currentState = state
     return playTime
 end

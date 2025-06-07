@@ -29,7 +29,6 @@ local function OnInteractClick(ui, viewButton)
 end
 
 function HudInteract:OnInit(node, config)
-    ViewBase.OnInit(self, node, config)
     self.currentOptions = {} -- 存储当前可交互的NPC选项
 
     -- 添加日志以确认节点状态

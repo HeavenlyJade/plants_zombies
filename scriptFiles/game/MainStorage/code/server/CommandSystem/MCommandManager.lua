@@ -28,6 +28,7 @@ CommandManager.handlers = {
     -- 物品相关
     ["give"] = ItemCommands.give,
     ["invsee"] = ItemCommands.invsee,
+    ["focusOn"] = SpellCommand.focusOn,
     ["clear"] = ItemCommands.clear,
     ["title"] = MiscCommands.title,
     ["spawnMob"] = MobCommand.spawnMob,

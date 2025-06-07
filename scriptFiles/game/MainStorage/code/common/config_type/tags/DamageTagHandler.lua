@@ -11,8 +11,6 @@ local SubSpell = require(MainStorage.code.server.spells.SubSpell) ---@type SubSp
 local DamageTag = ClassMgr.Class("DamageTag", TagHandler)
 
 function DamageTag:OnInit(data)
-    -- 初始化父类
-    TagHandler.OnInit(self, data)
     self["影响魔法"] = data["影响魔法"] or {} ---@type string[]
     self["影响魔法关键字"] = data["影响魔法关键字"] or "" ---@type string
     self["即将击杀"] = data["即将击杀"] or false ---@type boolean
@@ -184,14 +182,12 @@ end
 -- AttackTag子类
 local AttackTag = ClassMgr.Class("AttackTag", DamageTag)
 function AttackTag:OnInit(data)
-    DamageTag.OnInit(self, data)
     self.m_trigger = self["优先级"] > 10 and "攻击时（判断暴击后）" or "攻击时"
 end
 
 -- AttackedTag子类
 local AttackedTag = ClassMgr.Class("AttackedTag", DamageTag)
 function AttackedTag:OnInit(data)
-    DamageTag.OnInit(self, data)
     self.m_trigger = self["优先级"] > 10 and "被攻击时（判断暴击后）" or "被攻击时"
 end
 

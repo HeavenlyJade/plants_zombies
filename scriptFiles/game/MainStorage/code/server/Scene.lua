@@ -12,12 +12,12 @@ local Monster = require(MainStorage.code.server.entity_types.Monster) ---@type M
 local Npc = require(MainStorage.code.server.entity_types.Npc) ---@type Npc
 local AfkSpot = require(MainStorage.code.server.entity_types.AfkSpot) ---@type AfkSpot
 local TriggerZone = require(MainStorage.code.server.entity_types.TriggerZone) ---@type TriggerZone
+local Environment = game:GetService("WorkSpace")["Environment"] ---@type Environment
 
 
 local BagMgr = require(MainStorage.code.server.bag.BagMgr) ---@type BagMgr
 
--- 场景类：单个场景实例  g0(入口大厅)
----@class Scene
+---@class Scene:Class
 ---@field sceneId number 场景ID
 ---@field info table 场景信息
 ---@field name string 场景名称
@@ -31,6 +31,42 @@ local BagMgr = require(MainStorage.code.server.bag.BagMgr) ---@type BagMgr
 ---@field tick number 总tick值(递增)
 ---@field node SandboxNode
 local _M = ClassMgr.Class("Scene")
+_M.worldTime = 0
+_M.sceneId = 1
+local maxSlotRad = 2
+local unusedSlots = {} ---@type table[int, int]
+local occupiedSlot = {} ---@type Scene[][]
+
+ServerScheduler.add(function ()
+    _M.worldTime = _M.worldTime + 0.01
+    if _M.worldTime > 24 then
+        _M.worldTime = 0
+    end
+    Environment.TimeHour = _M.worldTime
+end, 0, 1)
+
+---@return Scene
+function _M:Clone()
+    if #unusedSlots < 0 then
+        maxSlotRad = maxSlotRad + 1
+        -- 生成新的方形环坐标
+        for x = -maxSlotRad, maxSlotRad do
+            for y = -maxSlotRad, maxSlotRad do
+                -- 只添加方形环上的点（不包括内部点）
+                if math.abs(x) == maxSlotRad or math.abs(y) == maxSlotRad then
+                    -- 将坐标转换为单个数字（使用位运算）
+                    local slot = {x, y}
+                    table.insert(unusedSlots, slot)
+                end
+            end
+        end
+    end
+    local slot = unusedSlots[#unusedSlots]
+    unusedSlots[#unusedSlots] = nil
+    local node = self.node:Clone()
+    node.Position = Vector3.New(50000 * slot[1], 0, 50000 * slot[2])
+    return _M.New(node)
+end
 
 ---初始化场景中的NPC
 function _M:initNpcs()
@@ -90,7 +126,6 @@ function _M:initAfkSpots()
         end
     end
     local all_afk_spots = TriggerZoneConfig.GetAll()
-    gg.log("初始化挂机点", all_afk_spots)
     for afk_name, afk_data in pairs(all_afk_spots) do
         if afk_data["场景"] == self.name then
             local sceneNode = self.node["挂机点"]
@@ -112,9 +147,10 @@ end
 
 ---创建新的场景实例
 ---@param info_ table 场景信息
-function _M:OnInit(name, sceneId)
-    self.name = name
-    self.sceneId = sceneId
+function _M:OnInit(node)
+    self.name = node.Name
+    self.sceneId = _M.sceneId
+    _M.sceneId = _M.sceneId + 1
     self.players = {} -- 玩家列表  [uin  = Player]
     self.monsters = {} -- 怪物列表  [uuid = Monster]
     self.npcs = {} -- NPC列表
@@ -123,12 +159,12 @@ function _M:OnInit(name, sceneId)
     self.drop_boxs = {} -- 掉落物品列表
     self.uuid2Entity = {}
     self.node2Entity = {}
-
+    print("Scene OnInit", self.name)
     self.tick = 0 -- 总tick值(递增)
 
     self.scene_config = nil -- 当前地图的节点scene刷怪配置,
     self.npc_spawn_config = {} -- 当前地图的NPC刷新点
-    self.node = game.WorkSpace["Ground"][name]
+    self.node = node
     self.sceneZone = self.node["场景区域"] ---@type TriggerBox
     self.sceneZone.Touched:Connect(function (node)
         print("EnterScene", node)
@@ -139,6 +175,7 @@ function _M:OnInit(name, sceneId)
             end
         end
     end)
+    gg.server_scene_list[ self.name ] = self
 
     self:initNpcs() -- Initialize NPCs after scene creation
     self:initAfkSpots() -- Initialize AfkSpots after scene creation
@@ -308,62 +345,19 @@ function _M:GetWorkSpace()
 end
 
 ---获得场景里的主建筑物gx
----@return SandboxNode|nil 主建筑物节点
-function _M:getGX()
-    if not self.sceneId then
-        gg.log('no sceneId:', self)
-        return
-    end
+-- ---@return SandboxNode|nil 主建筑物节点
+-- function _M:getGX()
+--     if not self.sceneId then
+--         gg.log('no sceneId:', self)
+--         return
+--     end
 
-    local ws_ = game:GetWorkSpace(self.sceneId)
-    if ws_ then
-        return ws_.Ground[self.name]
-    end
-    return nil
-end
-
----按照名字获得功能点的坐标  传送点:'tp0'  怪物出生点:'monster_spawn'
----@param node_name_ string 节点名称
----@return Vector3
-function _M:getFunctionPosXYZByName(node_name_)
-    local gx_node_ = self:getGX()
-    if gx_node_ then
-        local node_ = gx_node_[node_name_]
-        if node_ then
-            return node_.Position.x, node_.Position.y, node_.Position.z
-        end
-    end
-    return 0, 0, 0
-end
-
----直接获得坐标
----@param node_name_ string 节点名称
----@return Vector3|nil 位置向量
-function _M:getFunctionPosByName(node_name_)
-    local gx_node_ = self:getGX()
-    if gx_node_ then
-        local node_ = gx_node_[node_name_]
-        if node_ then
-            return node_.Position
-        end
-    end
-    return nil
-end
-
----通知目标丢失
----@param uuid_ string 怪物UUID
-function _M:InfoTargetLost(uuid_)
-    -- for uin_, player_ in pairs(self.players) do
-    --     if player_.target and player_.target.uuid == uuid_ then
-    --         local info_ = {
-    --             cmd = 'cmd_sync_target_info',
-    --             show = 0,
-    --             v = 'lost'
-    --         }
-    --         gg.network_channel:fireClient(uin_, info_)
-    --     end
-    -- end
-end
+--     local ws_ = game:GetWorkSpace(self.sceneId)
+--     if ws_ then
+--         return ws_.Ground[self.name]
+--     end
+--     return nil
+-- end
 
 ---增加一个掉落物箱
 ---@param item_ table 物品信息
@@ -398,19 +392,6 @@ function _M:check_drop()
     end
 end
 
----检查玩家是否离开太远
-function _M:check_player_alive()
-    for _, player_ in pairs(self.players) do
-        local gx_node_ = self:getGX()
-        local pos1_ = gx_node_.Position
-        local pos2_ = player_:GetPosition()
-        if gg.fast_out_distance(pos1_, pos2_, 12800) then
-            gg.log('player out range', self.name)
-            player_.actor.Position = Vector3.New(pos1_.x + gg.rand_int_both(200), pos1_.y + 200 + gg.rand_int(200),
-                pos1_.z + gg.rand_int_both(200))
-        end
-    end
-end
 
 ---查找附近的一个目标
 ---@param pos2_ Vector3 目标位置
@@ -439,14 +420,6 @@ function _M:update()
     -- 更新每一个怪物
     for _, monster_ in pairs(self.monsters) do
         monster_:update_monster()
-    end
-
-    -- 慢update
-    local mod_ = self.tick % 11
-    if mod_ == 3 then
-        self:check_player_alive()
-    -- elseif mod_ == 4 then
-    --     self:check_drop()
     end
 end
 

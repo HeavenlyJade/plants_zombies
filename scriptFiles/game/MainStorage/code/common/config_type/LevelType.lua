@@ -215,17 +215,11 @@ function LevelType:OnInit(data)
     -- 创建关卡实例
     self.levels = {}
     local Level = require(MainStorage.code.server.Scene.Level) ---@type Level
-    for _, sceneData in ipairs(data["场景节点"] or {}) do
-        local scene = gg.server_scene_list[sceneData["场景"]]
-        local path = sceneData["路径"]
-        if scene and path then
-            local node = scene:Get(path)
-        if node then
-                table.insert(self.levels, Level.New(self, node, #self.levels + 1, scene))
-            else
-                print(string.format("Warning: Failed to find scene node at %s/%s", scene, path))
-            end
-        end
+    local scene = gg.server_scene_list[data["场景"]]
+    if scene then
+        table.insert(self.levels, Level.New(self, scene, #self.levels + 1))
+    else
+        print(string.format("Warning: Failed to find scene node at %s", data["场景"]))
     end
 end
 
@@ -343,12 +337,10 @@ function LevelType:StartLevel()
     end
 
     if not availableLevel then
-        -- 如果没有可用的关卡实例，通知所有玩家
-        for _, player in pairs(self.matchQueue) do
-            player:SendChatText("当前没有可用的关卡实例，请稍后再试")
-            player:SendEvent("MatchCancel")
-        end
-        return
+        local newScene = self.levels[1].scene:Clone()
+        local Level = require(MainStorage.code.server.Scene.Level) ---@type Level
+        availableLevel = Level.New(self, newScene, #self.levels + 1)
+        table.insert(self.levels, availableLevel)
     end
 
     -- 将队列中的玩家添加到关卡

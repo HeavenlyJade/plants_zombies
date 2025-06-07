@@ -152,7 +152,6 @@ end
 local AOESpell = ClassMgr.Class("AOESpell", Spell)
 
 function AOESpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.duration = data["持续时间"] or 0
     self.canHitSameTarget = data["可重复击中同一目标"] or false
     self.hitInterval = data["击中间隔"] or 1

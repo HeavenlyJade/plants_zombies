@@ -22,7 +22,6 @@ local DOTBuffSpell = ClassMgr.Class("DOTBuffSpell", BuffSpell)
 local DOTBuff = ClassMgr.Class("DOTBuff", BuffSpell.ActiveBuff)
 
 function DOTBuffSpell:OnInit(data)
-    BuffSpell.OnInit(self, data)
     
     -- 从配置中读取DOT相关属性
     self.baseDamage = data["基础伤害"] or 0

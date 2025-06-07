@@ -18,7 +18,6 @@ local UIConfirm = ClassMgr.Class("UIConfirm", ViewBase)
 
 ---@override
 function UIConfirm:OnInit(node, config)
-    ViewBase.OnInit(self, node, config)
     self.title = self:Get("ui/title/title_text") ---@type UITextLabel
     self.content = self:Get("ui/content") ---@type UITextLabel
     self.confirmBtn = self:Get("ui/b_confirm") ---@type ViewButton

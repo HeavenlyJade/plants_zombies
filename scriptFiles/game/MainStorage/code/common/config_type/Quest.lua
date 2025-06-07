@@ -3,6 +3,7 @@ local ClassMgr = require(MainStorage.code.common.ClassMgr) ---@type ClassMgr
 local gg            = require(MainStorage.code.common.MGlobal) ---@type gg
 local Modifiers = require(MainStorage.code.common.config_type.modifier.Modifiers) ---@type Modifiers
 local ItemTypeConfig = require(MainStorage.code.common.config.ItemTypeConfig) ---@type ItemTypeConfig
+local Entity = require(MainStorage.code.server.entity_types.Entity) ---@type Entity
 
 ---@enum QuestRefreshType
 local QuestRefreshType = {
@@ -41,6 +42,7 @@ function Quest:OnInit(data)
     self.mailRewards = data["完成奖励_邮件"] ---@type table<string, number>
     self.completionCommands = data["完成指令"] ---@type string[]
     self.gotoSceneNode = data["前往场景节点"] ---@type string
+    self.focusOnUI = data["聚焦场景UI"]
     self.nextQuest = data["自动领取下一任务"]
     self.refreshType = data["刷新类型"] or QuestRefreshType.NONE
     
@@ -48,7 +50,6 @@ function Quest:OnInit(data)
     self.unfinishedCommands = data["未完成时执行指令"] or {} ---@type string[]
     self.showProgress = data["显示完成进度"]
     
-    -- Special fields for quest lists
     self.questList = data["任务列表"]
     self.rewardRequiredItem = data["奖励需求物品"]
     self.rewards = data["奖励"]
@@ -62,8 +63,19 @@ function Quest:OnClick(player)
             gg.log("任务%s有不存在的节点%s", self.name, self.gotoSceneNode)
             return
         end
-        print("targetPos", node.Position, player.actor.Position)
-        player.actor:MoveTo(node.Position)
+        local cb = nil
+        local e = Entity.node2Entity[node] ---@cast e Npc
+        gg.log("e", node.Name, e)
+        if ClassMgr.Is(e, "Npc") then
+            cb = function ()
+                e:HandleInteraction(player)
+            end
+        end
+        player:NavigateTo(node.Position, math.max(node.Size.x, node.Size.z) + 100, cb)
+    end
+    if self.focusOnUI then
+        player.focusOnCommandsCb = self.focusOnUI["完成时执行指令"]
+        player:SendEvent("FocusOnUI", self.focusOnUI)
     end
 end
 

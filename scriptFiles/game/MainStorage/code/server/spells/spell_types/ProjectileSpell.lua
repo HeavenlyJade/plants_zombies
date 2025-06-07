@@ -49,7 +49,6 @@ local ProjectileSpell = ClassMgr.Class("ProjectileSpell", Spell)
 local ProjectileItem = {}
 
 function ProjectileSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.projectileModel = data["飞弹模型"] or "飞弹"
     self.canHitSameTarget = data["可重复碰撞同一目标"] or false
     self.hitInterval = data["对同一目标生效间隔"] or -1

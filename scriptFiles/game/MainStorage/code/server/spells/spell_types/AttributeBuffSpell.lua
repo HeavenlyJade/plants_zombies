@@ -15,7 +15,6 @@ local AttributeBuffSpell = ClassMgr.Class("AttributeBuffSpell", BuffSpell)
 local AttrBuff = ClassMgr.Class("AttrBuff", BuffSpell.ActiveBuff)
 
 function AttributeBuffSpell:OnInit(data)
-    BuffSpell.OnInit(self, data)
     
     -- 从配置中读取属性BUFF相关属性
     self.statType = data["属性类型"]

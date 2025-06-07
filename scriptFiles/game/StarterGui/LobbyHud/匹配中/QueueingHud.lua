@@ -17,15 +17,12 @@ local uiConfig = {
 }
 
 function QueueingHud:OnInit(node, config)
-    ViewBase.OnInit(self, node, config)
     local exitButton = self:Get("匹配底图/退出按钮", ViewButton)
     self.matchProgress = self:Get("匹配底图/匹配进度") ---@type ViewComponent
     
-    -- 监听匹配进度更新
     ClientEventManager.Subscribe("MatchProgressUpdate", function(data)
         if data.currentCount and data.totalCount then
             self.matchProgress.node.Title = string.format("匹配中: %d/%d", data.currentCount, data.totalCount)
-            -- 当收到匹配进度更新时，确保UI是打开的
             self:Open()
         end
     end)

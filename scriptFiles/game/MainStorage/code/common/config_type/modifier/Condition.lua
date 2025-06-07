@@ -22,7 +22,6 @@ end
 ---@class HealthCondition:BetweenCondition
 local HealthCondition = ClassMgr.Class("HealthCondition", BetweenCondition)
 function HealthCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.isPercentage = data["百分比"] == nil and true or data["百分比"]
 end
 function HealthCondition:Check(modifier, caster, target)
@@ -41,7 +40,6 @@ end
 ---@class VariableCondition:BetweenCondition
 local VariableCondition = ClassMgr.Class("VariableCondition", BetweenCondition)
 function VariableCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.name = data["名字"]
 end
 function VariableCondition:Check(modifier, caster, target)
@@ -54,7 +52,6 @@ end
 ---@class StatCondition:BetweenCondition
 local StatCondition = ClassMgr.Class("StatCondition", BetweenCondition)
 function StatCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.name = data["名字"]
 end
 function StatCondition:Check(modifier, caster, target)
@@ -81,7 +78,6 @@ end
 ---@class BuffActiveCondition:BetweenCondition
 local BuffActiveCondition = ClassMgr.Class("BuffActiveCondition", BetweenCondition)
 function BuffActiveCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.buffKeyword = data["Buff关键字"]
 end
 function BuffActiveCondition:Check(modifier, caster, target)
@@ -108,7 +104,6 @@ end
 ---@class TagLevelCondition:BetweenCondition
 local TagLevelCondition = ClassMgr.Class("TagLevelCondition", BetweenCondition)
 function TagLevelCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.tagName = data["词条名"]
 end
 function TagLevelCondition:Check(modifier, caster, target)
@@ -126,7 +121,6 @@ end
 ---@class ShieldCondition:BetweenCondition
 local ShieldCondition = ClassMgr.Class("ShieldCondition", BetweenCondition)
 function ShieldCondition:OnInit(data)
-    BetweenCondition.OnInit(self, data)
     self.isPercentage = data["百分比"] == nil and true or data["百分比"]
 end
 function ShieldCondition:Check(modifier, caster, target)

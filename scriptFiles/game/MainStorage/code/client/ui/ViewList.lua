@@ -16,7 +16,6 @@ local ViewList = ClassMgr.Class("ViewList", ViewComponent)
 ---@param ui ViewBase
 ---@param onAddElementCb fun(child: SandboxNode): ViewComponent
 function ViewList:OnInit(node, ui, path, onAddElementCb)
-    ViewComponent.OnInit(self, node, ui, path)
     self.childrens = {} ---@type ViewComponent[]
     self.childNameTemplate = nil
     self.onAddElementCb = onAddElementCb or function(child)

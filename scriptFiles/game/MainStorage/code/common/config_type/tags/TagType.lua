@@ -51,12 +51,10 @@ function TagType:GetDescription(level)
                 gg.log("修改数值", modifier, modifier.paramValue)
                 if modifier and modifier.paramValue then
                     local finalRate = modifier.paramValue["倍率"] * handler:GetUpgradeValue("修改数值倍率", level, 1)
-                    local isPercentage = modifier.paramValue["增加类型"] == "增加"
-                    local percentageSign = isPercentage and "%" or ""
                     if modifier.paramValue.attributeType and modifier.paramValue.attributeType.name then
-                        return string.format("%.1f%s%s", finalRate, percentageSign, modifier.paramValue.attributeType.name)
+                        return string.format("%.1f%s", finalRate, modifier.paramValue.attributeType.name)
                     else
-                        return string.format("%.1f%s", finalRate, percentageSign)
+                        return string.format("%.1f", finalRate)
                     end
                 end
             end
@@ -66,12 +64,10 @@ function TagType:GetDescription(level)
                 local element = handler["属性增伤"][arrayIndex]
                 if element then
                     local finalRate = element.multiplier * handler:GetUpgradeValue("属性增伤倍率", level, 1)
-                    local isPercentage = element.addType == "增加"
-                    local percentageSign = isPercentage and "%" or ""
                     if element.statType then
-                        return string.format("%.1f%s%s", finalRate, percentageSign, element.statType)
+                        return string.format("%.1f%s", finalRate, element.statType)
                     else
-                        return string.format("%.1f%s", finalRate, percentageSign)
+                        return string.format("%.1f", finalRate)
                     end
                 end
             end

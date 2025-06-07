@@ -10,9 +10,6 @@ local SubSpell = require(MainStorage.code.server.spells.SubSpell) ---@type SubSp
 local SpellTag = ClassMgr.Class("SpellTag", TagHandler)
 
 function SpellTag:OnInit(data)
-    -- 初始化父类
-    TagHandler.OnInit(self, data)
-    
     -- 初始化SpellTag特有属性
     self["影响魔法"] = data["影响魔法"] or {} ---@type string[]
     self["影响魔法关键字"] = data["影响魔法关键字"] or "" ---@type string

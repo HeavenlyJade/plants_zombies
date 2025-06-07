@@ -7,6 +7,7 @@ local ServerEventManager = require(MainStorage.code.server.event.ServerEventMana
 local SkillTypeConfig = require(MainStorage.code.common.config.SkillTypeConfig) ---@type SkillTypeConfig
 local Skill = require(MainStorage.code.server.spells.Skill) ---@type Skill
 local SkillEventConfig = require(MainStorage.code.common.event_conf.event_skill) ---@type SkillEventConfig
+local SkillCommon = require(MainStorage.code.server.spells.SkillCommon) ---@type SkillCommon
 local common_config = require(MainStorage.code.common.MConfig) ---@type common_config
 
 
@@ -44,13 +45,19 @@ function SkillEventManager.RegisterEventHandlers()
     -- 升级技能
     ServerEventManager.Subscribe(SkillEventManager.REQUEST.UPGRADE, SkillEventManager.HandleUpgradeSkill)
 
+    -- 一键强化技能
+    ServerEventManager.Subscribe(SkillEventManager.REQUEST.UPGRADE_ALL, SkillEventManager.HandleUpgradeAllSkill)
+
     -- 装备技能
     ServerEventManager.Subscribe(SkillEventManager.REQUEST.EQUIP, SkillEventManager.HandleEquipSkill)
 
     -- 卸下技能
     ServerEventManager.Subscribe(SkillEventManager.REQUEST.UNEQUIP, SkillEventManager.HandleUnequipSkill)
 
-    gg.log("已注册 " .. 4 .. " 个技能事件处理器")
+    -- 销毁技能
+    ServerEventManager.Subscribe(SkillEventManager.REQUEST.DESTROY, SkillEventManager.HandleDestroySkill)
+
+    gg.log("已注册 " .. 6 .. " 个技能事件处理器")
 end
 
 --- 验证玩家和基础参数
@@ -60,7 +67,7 @@ end
 function SkillEventManager.ValidatePlayer(evt, eventName)
     local env_player = evt.player
     local uin = env_player.uin
-    gg.log("env_player",env_player,uin)
+    gg.log("env_player", env_player, uin)
     if not uin then
         gg.log("事件 " .. eventName .. " 缺少玩家UIN参数")
         return nil, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS
@@ -94,21 +101,7 @@ function SkillEventManager.SendSuccessResponse(evt, eventName, data)
     })
 end
 
---- 发送错误响应给客户端
----@param evt table 事件参数
----@param errorCode number 错误码
-function SkillEventManager.SendErrorResponse(evt, errorCode)
-    local uin = evt.player.uin
-    local errorMessage = SkillEventConfig.GetErrorMessage(errorCode)
 
-    gg.network_channel:fireClient(uin, {
-        cmd = SkillEventManager.RESPONSE.ERROR,
-        data = {
-            errorCode = errorCode,
-            errorMessage = errorMessage
-        }
-    })
-end
 
 --[[
 ===================================
@@ -119,7 +112,7 @@ end
 --- 处理技能学习请求
 ---@param evt table 事件数据 {uin, skillName}
 function SkillEventManager.HandleLearnSkill(evt)
-    gg.log("处理学习技能请求",evt)
+    gg.log("处理学习技能请求", evt)
     local player, errorCode = SkillEventManager.ValidatePlayer(evt, "LearnSkill")
     if not player then
         return
@@ -129,7 +122,6 @@ function SkillEventManager.HandleLearnSkill(evt)
     local skillName = evt.skillName
     if not skillName then
         gg.log("技能名称不能为空")
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS)
         return
     end
 
@@ -137,7 +129,6 @@ function SkillEventManager.HandleLearnSkill(evt)
     local skillType = SkillTypeConfig.Get(skillName)
     if not skillType then
         gg.log("技能配置文件不存在: " .. skillName .. " 玩家: " .. player.name)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_FOUND)
         return
     end
 
@@ -145,7 +136,6 @@ function SkillEventManager.HandleLearnSkill(evt)
     local existingSkill = player.skills and player.skills[skillName]
     if existingSkill then
         gg.log("玩家已拥有该技能: " .. skillName)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_ALREADY_LEARNED)
         return
     end
 
@@ -155,7 +145,6 @@ function SkillEventManager.HandleLearnSkill(evt)
     local success = player:LearnSkill(skillType)
     if not success then
         gg.log("技能学习失败: " .. skillName)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.UPGRADE_FAILED)
         return
     end
 
@@ -188,7 +177,6 @@ function SkillEventManager.HandleUpgradeSkill(evt)
     local skillName = evt.skillName
     if not skillName then
         gg.log("技能名称不能为空")
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS)
         return
     end
 
@@ -196,7 +184,6 @@ function SkillEventManager.HandleUpgradeSkill(evt)
     local skillType = SkillTypeConfig.Get(skillName)
     if not skillType then
         gg.log("技能配置文件不存在: " .. skillName .. " 玩家: " .. player.name)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_FOUND)
         return
     end
 
@@ -205,39 +192,33 @@ function SkillEventManager.HandleUpgradeSkill(evt)
         -- 主卡技能：检查父类技能是否存在
         local prerequisite = skillType.prerequisite or {}
         for i, preSkillType in ipairs(prerequisite) do
-            if not (player.skills and player.skills[preSkillType.name]) then
-                gg.log("父类技能不存在，无法升级: " .. skillName .. " 缺少前置技能: " .. preSkillType.name)
-                SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_AVAILABLE)
-                return
-            end
+                    if not (player.skills and player.skills[preSkillType.name]) then
+            gg.log("父类技能不存在，无法升级: " .. skillName .. " 缺少前置技能: " .. preSkillType.name)
+            return
+        end
         end
         -- 检查玩家是否已拥有该技能
         local existingSkill = player.skills and player.skills[skillName]
         -- 检查是否已达到最大等级
         if existingSkill and existingSkill.level >= skillType.maxLevel then
             gg.log("技能已达到最大等级: " .. skillName .. " 当前等级: " .. existingSkill.level)
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.MAX_LEVEL_REACHED)
             return
         end
-
     elseif skillType.skillType == 1 then
         -- 副卡技能：只检查技能是否存在
         local existingSkill = player.skills and player.skills[skillName]
         if not existingSkill then
             gg.log("副卡技能不存在，无法升级: " .. skillName)
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_OWNED)
             return
         end
 
         -- 检查是否已达到最大等级
         if existingSkill.level >= skillType.maxLevel then
             gg.log("副卡技能已达到最大等级: " .. skillName .. " 当前等级: " .. existingSkill.level)
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.MAX_LEVEL_REACHED)
             return
         end
     else
         gg.log("未知的技能类型: " .. skillName .. " 类型: " .. (skillType.skillType or "nil"))
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_FOUND)
         return
     end
 
@@ -247,7 +228,6 @@ function SkillEventManager.HandleUpgradeSkill(evt)
     local success = player:UpgradeSkill(skillType)
     if not success then
         gg.log("技能升级失败: " .. skillName)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.UPGRADE_FAILED)
         return
     end
 
@@ -267,6 +247,139 @@ function SkillEventManager.HandleUpgradeSkill(evt)
     SkillEventManager.SendSuccessResponse(evt, SkillEventManager.RESPONSE.UPGRADE, responseData)
 end
 
+--- 处理一键强化技能请求
+---@param evt table 事件数据 {uin, skillName}
+function SkillEventManager.HandleUpgradeAllSkill(evt)
+    gg.log("处理一键强化技能请求", evt)
+    local player, errorCode = SkillEventManager.ValidatePlayer(evt, "UpgradeAllSkill")
+    if not player then
+        return
+    end
+
+    -- 从evt中获取技能名称
+    local skillName = evt.skillName
+    if not skillName then
+        gg.log("技能名称不能为空")
+        return
+    end
+
+    -- 验证技能是否存在于配置中
+    local skillType = SkillTypeConfig.Get(skillName)
+    if not skillType then
+        gg.log("技能配置文件不存在: " .. skillName .. " 玩家: " .. player.name)
+        return
+    end
+
+    -- 检查玩家是否拥有该技能
+    local existingSkill = player.skills and player.skills[skillName]
+    if not existingSkill then
+        gg.log("玩家不拥有该技能: " .. skillName)
+        return
+    end
+
+    -- 检查技能是否已达到最大等级
+    local currentLevel = existingSkill.level
+    local maxLevel = skillType.maxLevel or 1
+    if currentLevel >= maxLevel then
+        gg.log("技能已达到最大等级: " .. skillName .. " 当前等级: " .. currentLevel)
+        return
+    end
+
+    gg.log("开始一键强化技能: " .. skillName .. " 从等级 " .. currentLevel .. " 到等级 " .. maxLevel)
+
+    -- 执行一键强化逻辑
+    local upgradeResult = SkillEventManager.PerformUpgradeAll(player, skillType, existingSkill)
+
+    -- 保存玩家技能配置
+    player:saveSkillConfig()
+
+    -- 发送响应
+    local responseData = {
+        skillName = skillName,
+        originalLevel = currentLevel,
+        finalLevel = upgradeResult.finalLevel,
+        level = upgradeResult.finalLevel, -- 保持向后兼容
+        slot = existingSkill.equipSlot,
+        errorCode = upgradeResult.errorCode,
+        resourcesUsed = upgradeResult.resourcesUsed or {}
+    }
+
+    gg.log("一键强化完成", skillName, "原等级:", currentLevel, "最终等级:", upgradeResult.finalLevel, "错误码:", upgradeResult.errorCode)
+    SkillEventManager.SendSuccessResponse(evt, SkillEventManager.RESPONSE.UPGRADE_ALL, responseData)
+end
+
+--- 执行一键强化逻辑
+---@param player Player 玩家对象
+---@param skillType SkillType 技能配置
+---@param skill table 技能实例
+---@return table 升级结果 {finalLevel, errorCode, resourcesUsed}
+function SkillEventManager.PerformUpgradeAll(player, skillType, skill)
+    local currentLevel = skill.level
+    local maxLevel = skillType.maxLevel or 1
+    local finalLevel = currentLevel
+    local resourcesUsed = {}
+    local errorCode = SkillEventManager.ERROR_CODES.SUCCESS
+
+    gg.log("执行一键强化:", skillType.name, "当前等级:", currentLevel, "目标等级:", maxLevel)
+
+    -- 计算总升级成本
+    local totalCost = {}
+
+    for level = currentLevel + 1, maxLevel do
+        -- 使用SkillType:GetCostAtLevel函数计算每一级的消耗
+        local levelCosts = skillType:GetCostAtLevel(level)
+        if levelCosts then
+            for resourceType, amount in pairs(levelCosts) do
+                totalCost[resourceType.name] = (totalCost[resourceType.name] or 0) + amount
+            end
+        end
+    end
+
+    gg.log("计算总升级成本:", totalCost)
+
+    -- 检查玩家资源是否足够
+    local canAffordAll = true
+    for resourceTypeName, requiredAmount in pairs(totalCost) do
+        local playerAmount = player.resources and player.resources[resourceTypeName] or 0
+        if playerAmount < requiredAmount then
+            gg.log("资源不足:", resourceTypeName, "需要:", requiredAmount, "拥有:", playerAmount)
+            canAffordAll = false
+            break
+        end
+    end
+
+    if canAffordAll then
+        -- 资源充足，直接升级到满级
+        gg.log("资源充足，直接升级到满级")
+
+        -- 扣除资源
+        for resourceTypeName, amount in pairs(totalCost) do
+            if player.resources and player.resources[resourceTypeName] then
+                player.resources[resourceTypeName] = player.resources[resourceTypeName] - amount
+                resourcesUsed[resourceTypeName] = amount
+            end
+        end
+
+        -- 升级到满级
+        skill.level = maxLevel
+        finalLevel = maxLevel
+        errorCode = SkillEventManager.ERROR_CODES.SUCCESS
+
+        gg.log("一键强化成功，技能升级到满级:", maxLevel)
+    else
+        -- 资源不足，直接失败
+        gg.log("资源不足，无法升级")
+        finalLevel = currentLevel
+        errorCode = SkillEventManager.ERROR_CODES.INSUFFICIENT_RESOURCES
+    end
+
+    return {
+        finalLevel = finalLevel,
+        errorCode = errorCode,
+        resourcesUsed = resourcesUsed
+    }
+end
+
 --- 处理装备技能请求
 ---@param evt table 事件数据 {uin, skillName, slot}
 function SkillEventManager.HandleEquipSkill(evt)
@@ -284,7 +397,6 @@ function SkillEventManager.HandleEquipSkill(evt)
     -- 参数验证
     if not skillName then
         gg.log("技能名称不能为空")
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS)
         return
     end
 
@@ -292,7 +404,6 @@ function SkillEventManager.HandleEquipSkill(evt)
     local skill = player.skills and player.skills[skillName]
     if not skill then
         gg.log("玩家技能不存在: " .. skillName .. " 玩家: " .. player.name)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_OWNED)
         return
     end
 
@@ -300,7 +411,6 @@ function SkillEventManager.HandleEquipSkill(evt)
     local skillType = SkillTypeConfig.Get(skillName)
     if not skillType then
         gg.log("技能配置不存在: " .. skillName)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SKILL_NOT_FOUND)
         return
     end
 
@@ -312,7 +422,6 @@ function SkillEventManager.HandleEquipSkill(evt)
         local mainCardConfig = common_config.EquipmentSlot["主卡"]
         if not mainCardConfig then
             gg.log("主卡配置不存在")
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS)
             return
         end
 
@@ -325,7 +434,6 @@ function SkillEventManager.HandleEquipSkill(evt)
 
         if not mainCardSlot then
             gg.log("没有找到可用的主卡槽位")
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_SLOT)
             return
         end
 
@@ -340,7 +448,6 @@ function SkillEventManager.HandleEquipSkill(evt)
         local subCardConfig = common_config.EquipmentSlot["副卡"]
         if not subCardConfig then
             gg.log("副卡配置不存在")
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_PARAMETERS)
             return
         end
 
@@ -376,7 +483,6 @@ function SkillEventManager.HandleEquipSkill(evt)
 
         if not availableSlot then
             gg.log("没有找到可用的副卡槽位")
-            SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.INVALID_SLOT)
             return
         end
 
@@ -395,43 +501,109 @@ function SkillEventManager.HandleEquipSkill(evt)
         })
     else
         gg.log("技能装备失败: " .. skillName .. " 槽位: " .. slot)
-        SkillEventManager.SendErrorResponse(evt, SkillEventManager.ERROR_CODES.SLOT_OCCUPIED)
     end
 end
 
 --- 处理卸下技能请求
----@param evt table 事件数据 {uin, slot}
+---@param evt table 事件数据 {uin, skillName} 或 {uin, slot}
 function SkillEventManager.HandleUnequipSkill(evt)
+    gg.log("处理卸下技能请求", evt)
     local player, errorCode = SkillEventManager.ValidatePlayer(evt, "UnequipSkill")
     if not player then
         return
     end
 
-    -- 从evt中提取参数
+    local skillName = evt.skillName
     local slot = evt.slot or evt.slotIndex
-    if not slot or slot < 1 or slot > 6 then
+
+    -- 优先使用 skillName 参数
+    if skillName then
+        gg.log("通过技能名称卸下装备:", skillName)
+
+        -- 验证技能是否存在
+        local skill = player.skills and player.skills[skillName]
+        if not skill then
+            gg.log("玩家技能不存在: " .. skillName .. " 玩家: " .. player.name)
+            return
+        end
+
+        -- 检查技能是否已装备
+        if skill.equipSlot == 0 then
+            gg.log("技能未装备，无法卸下: " .. skillName)
+            return
+        end
+
+        slot = skill.equipSlot
+        gg.log("找到技能装备槽位:", skillName, "槽位:", slot)
+
+
+        -- 获取当前装备的技能
+        local equippedSkill = player.equippedSkills and player.equippedSkills[slot]
+        if not equippedSkill then
+            gg.log("槽位没有装备技能:", slot)
+            return
+        end
+
+    else
+        gg.log("缺少必要参数: skillName 或 slot")
         return
     end
 
-    -- 获取当前装备的技能
-    local equippedSkill = player.equippedSkills and player.equippedSkills[slot]
-    if not equippedSkill then
-        return
-    end
-
-    local skillName = equippedSkill.skillType.skillName
-
-    -- 执行卸下
+    -- 执行卸下操作
     local success = player:UnequipSkill(slot)
     if success then
-        SkillEventManager.SendSuccessResponse(evt, SkillEventManager.RESPONSE.UNEQUIP, {
+        player:saveSkillConfig()
+
+        gg.log("技能卸下成功:", skillName, "槽位:", slot)
+
+        local responseData = {
             skillName = skillName,
-            slot = slot
-        })
+            slot = 0, -- 卸下后槽位为0
+            level = player.skills[skillName].level
+        }
+
+        gg.log("发送技能卸下响应", responseData)
+        SkillEventManager.SendSuccessResponse(evt, SkillEventManager.RESPONSE.UNEQUIP, responseData)
     else
-        SkillEventManager.SendSuccessResponse(evt, SkillEventManager.RESPONSE.ERROR, {
-            errorCode = SkillEventManager.ERROR_CODES.INVALID_SLOT
-        })
+        gg.log("技能卸下失败:", skillName, "槽位:", slot)
+    end
+end
+
+--- 处理销毁技能请求
+---@param evt table 事件数据 {uin, skillName}
+function SkillEventManager.HandleDestroySkill(evt)
+    gg.log("处理销毁技能请求", evt)
+    local player, errorCode = SkillEventManager.ValidatePlayer(evt, "DestroySkill")
+    if not player then
+        return
+    end
+
+    -- 从evt中获取参数
+    local skillName = evt.skillName
+
+    -- 使用SkillCommon的验证方法
+    local skillType, skillInstance, errorCode = SkillCommon.ValidateSkillAndPlayer(player, skillName)
+
+    if errorCode ~= SkillEventManager.ERROR_CODES.SUCCESS then
+        gg.log("技能验证失败: " .. skillName .. " 错误: " .. SkillEventConfig.GetErrorMessage(errorCode))
+        return
+    end
+
+    gg.log("开始销毁技能: " .. skillName)
+
+    -- 执行销毁逻辑
+    local destroyResult = SkillCommon.PerformSkillDestroy(player, skillName)
+
+    if destroyResult.success then
+        -- 保存玩家数据
+        player:saveSkillConfig()
+
+        -- 同步最新的技能数据到客户端
+        player:syncSkillData()
+
+        gg.log("技能销毁成功", skillName, "同时销毁的技能:", table.concat(destroyResult.destroyedSkills, ", "))
+    else
+        gg.log("技能销毁失败:", skillName, "错误:", destroyResult.errorCode)
     end
 end
 

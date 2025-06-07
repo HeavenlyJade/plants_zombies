@@ -12,7 +12,6 @@ local Battle = require(MainStorage.code.server.Battle) ---@type Battle
 local ShieldSpell = ClassMgr.Class("ShieldSpell", Spell)
 
 function ShieldSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.baseShield = data.baseShield or 0
     self.baseMultiplier = data.baseMultiplier or 1
     self.damageAmplifiers = data.damageAmplifiers or {}

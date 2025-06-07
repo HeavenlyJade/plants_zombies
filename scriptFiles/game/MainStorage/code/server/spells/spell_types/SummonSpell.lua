@@ -19,7 +19,6 @@ local ServerEventManager = require(MainStorage.code.server.event.ServerEventMana
 local SummonSpell = ClassMgr.Class("SummonSpell", Spell)
 
 function SummonSpell:OnInit(data)
-    Spell.OnInit(self, data)
     self.summonAtTargetPos = data["召唤在目标位置"] ---@type boolean
     self.mobTypeName = data["怪物类型"] or ""
     self.maxCount = data["最大数量"] or 1

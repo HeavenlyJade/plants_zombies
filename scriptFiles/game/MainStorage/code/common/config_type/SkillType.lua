@@ -22,6 +22,7 @@ function SkillType:OnInit(data)
     self.maxLevel = data["最大等级"] or 1
     self.description = data["技能描述"] or ""
     self.icon = data["技能图标"] or ""
+    self.miniIcon = data["技能小角标"] or ""
     self.effectiveWithoutEquip = data["无需装备也可生效"] or false
     ---客户端
     self.isEntrySkill = data["是入口技能"] or false

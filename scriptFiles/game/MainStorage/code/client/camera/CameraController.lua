@@ -357,9 +357,6 @@ end
 
 function CameraController.CalcCameraPosition(pivotPosition, xAxisDegrees, yAxisDegrees, distance, dt)
     local shakePosDelta = ShakeController.GetPosDelta()
-    if shakePosDelta.z ~= 0 then
-        gg.log("shakePosDelta", shakePosDelta)
-    end
     local orient = CameraController.CalcCameraRotation(xAxisDegrees, yAxisDegrees)
     local cameraPos = pivotPosition + orient:GetBackward() * distance + orient * shakePosDelta
     return cameraPos
